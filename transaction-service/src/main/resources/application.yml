@@ -21,8 +21,12 @@ feign:
         connectTimeout: 5000
         readTimeout: 5000
 
+# JWT Configuration (must match auth-service secret)
+jwt:
+  secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
+
 account-service:
-  url: http://127.0.0.1:9001
+  url: http://127.0.0.1:8081
 
 logging:
   level:

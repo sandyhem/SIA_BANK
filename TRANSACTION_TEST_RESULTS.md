@@ -47,9 +47,9 @@ TO Account (ACCF72EE2CD):  ₹1450.00      (Increased by ₹100)
 ┌─────────────────────────────────────────────────────────┐
 │ TRANSACTION SERVICE (8082 - HTTPS with mTLS)            │
 │                                                         │
-│ 1. Validates request                                   │
-│ 2. Creates debit request for source account            │
-│ 3. Calls Account Service via Feign (with mTLS)        │
+│ 1. Validates request                                    │
+│ 2. Creates debit request for source account             │
+│ 3. Calls Account Service via Feign (with mTLS)          │
 └────────────┬────────────────────────────────────────────┘
              │
              │ FEIGN CLIENT with mTLS
@@ -59,39 +59,39 @@ TO Account (ACCF72EE2CD):  ₹1450.00      (Increased by ₹100)
              │
              ▼
 ┌─────────────────────────────────────────────────────────┐
-│ ACCOUNT SERVICE (8443 - HTTPS with mTLS)               │
+│ ACCOUNT SERVICE (8443 - HTTPS with mTLS)                │
 │                                                         │
-│ 1. Validates client certificate                        │
-│ 2. Debit Account ACC001 by ₹100                        │
-│ 3. Returns success response                            │
+│ 1. Validates client certificate                         │
+│ 2. Debit Account ACC001 by ₹100                         │
+│ 3. Returns success response                             │
 └────────────┬────────────────────────────────────────────┘
              │
              ▼ (Back to Transaction Service)
 ┌─────────────────────────────────────────────────────────┐
 │ TRANSACTION SERVICE (Continues)                         │
 │                                                         │
-│ 4. Creates credit request for destination account      │
-│ 5. Calls Account Service again via Feign (mTLS)       │
+│ 4. Creates credit request for destination account       │
+│ 5. Calls Account Service again via Feign (mTLS)         │
 └────────────┬────────────────────────────────────────────┘
-             │
+             │ 
              │ FEIGN CLIENT with mTLS
              │
              ▼
 ┌─────────────────────────────────────────────────────────┐
 │ ACCOUNT SERVICE (8443)                                  │
 │                                                         │
-│ 1. Validates client certificate                        │
-│ 2. Credit Account ACCF72EE2CD by ₹100                 │
-│ 3. Returns success response                            │
+│ 1. Validates client certificate                         │
+│ 2. Credit Account ACCF72EE2CD by ₹100                   │
+│ 3. Returns success response                             │
 └────────────┬────────────────────────────────────────────┘
              │
              ▼ (Back to Transaction Service)
 ┌─────────────────────────────────────────────────────────┐
 │ TRANSACTION SERVICE (Completes)                         │
 │                                                         │
-│ 6. Saves transaction record in database                │
-│ 7. Returns success response                            │
-│ "Transfer successful. Transaction ID: TXN4309C71D-566" │
+│ 6. Saves transaction record in database                 │
+│ 7. Returns success response                             │
+│ "Transfer successful. Transaction ID: TXN4309C71D-566"  │
 └─────────────────────────────────────────────────────────┘
 ```
 
