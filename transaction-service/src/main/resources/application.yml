@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/transaction_db
+    username: appuser
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  application:
+    name: transaction-service
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+
+account-service:
+  url: http://127.0.0.1:9001
+
+logging:
+  level:
+    com.banking.transaction: DEBUG
+
+server:
+  port: 8082

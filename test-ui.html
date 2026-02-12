@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banking Microservices - API Tester</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #333; margin-bottom: 5px; }
+        .header p { color: #666; }
+        .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { color: #007bff; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #333; font-weight: 500; font-size: 14px; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        .form-group input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.25); }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px; width: 100%; }
+        button:hover { background: #0056b3; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #1e7e34; }
+        .response { margin-top: 15px; padding: 12px; background: #f9f9f9; border-left: 3px solid #007bff; border-radius: 4px; display: none; }
+        .response.show { display: block; }
+        .response.error { border-left-color: #dc3545; background: #fff5f5; }
+        .response.success { border-left-color: #28a745; background: #f0f9ff; }
+        .response h3 { color: #333; font-size: 12px; margin-bottom: 8px; }
+        .response pre { background: white; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 11px; color: #333; max-height: 300px; }
+        .status { display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-top: 8px; }
+        .status.ok { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .loading { display: none; color: #007bff; font-size: 12px; margin-top: 8px; }
+        .db-info { background: #e7f3ff; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 12px; color: #333; }
+        .section { background: #f8f9fa; padding: 12px; border-radius: 4px; margin-bottom: 15px; }
+        .section h3 { color: #555; margin-bottom: 10px; font-size: 14px; }
+        @media (max-width: 1024px) { .cards { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Banking Microservices - API Tester</h1>
+            <p>Test Account and Transaction Service APIs directly from your browser</p>
+        </div>
+
+        <div class="cards">
+            <!-- Account Service Card -->
+            <div class="card">
+                <h2>📋 Account Service (Port 8081)</h2>
+                <div class="db-info">✓ Service: http://localhost:8081</div>
+
+                <!-- Health Check -->
+                <div class="section" style="background: #d4edda;">
+                    <h3>🏥 Health Check</h3>
+                    <button class="success" onclick="checkAccountHealth()">Check Account Service</button>
+                    <div class="loading" id="accountHealthLoading">Loading...</div>
+                    <div class="response" id="accountHealthResponse"></div>
+                </div>
+
+                <!-- Get All Accounts -->
+                <div class="section">
+                    <h3>📋 Get All Accounts</h3>
+                    <button class="success" onclick="getAllAccounts()">Get All Accounts</button>
+                    <div class="loading" id="getAllLoading">Loading...</div>
+                    <div class="response" id="getAllResponse"></div>
+                </div>
+
+                <!-- Get Account -->
+                <div class="section">
+                    <h3>🔍 Get Account Details</h3>
+                    <div class="form-group">
+                        <label>Account Number</label>
+                        <input type="text" id="getAccountNumber" placeholder="e.g., ACC001" value="ACC001">
+                    </div>
+                    <button class="success" onclick="getAccount()">Get Account</button>
+                    <div class="loading" id="getLoading">Loading...</div>
+                    <div class="response" id="getResponse"></div>
+                </div>
+
+                <!-- Create Account -->
+                <div class="section" style="background: #fff3cd;">
+                    <h3>➕ Create New Account</h3>
+                    <div class="form-group">
+                        <label>Customer ID</label>
+                        <input type="number" id="createCustomerId" placeholder="e.g., 100" value="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Balance</label>
+                        <input type="number" id="createBalance" placeholder="e.g., 1000.00" value="1000" step="0.01">
+                    </div>
+                    <button style="background: #17a2b8;" onclick="createAccount()">Create Account</button>
+                    <div class="loading" id="createLoading">Loading...</div>
+                    <div class="response" id="createResponse"></div>
+                </div>
+
+                <!-- Credit Account -->
+                <div class="section" style="background: #d1f2eb;">
+                    <h3>💰 Credit Account (Deposit)</h3>
+                    <div class="form-group">
+                        <label>Account Number</label>
+                        <input type="text" id="creditAccountNumber" placeholder="e.g., ACC001" value="ACC001">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="creditAmount" placeholder="e.g., 500.00" value="500" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="creditDescription" placeholder="e.g., Salary" value="Test deposit">
+                    </div>
+                    <button style="background: #28a745;" onclick="creditAccount()">Credit Account</button>
+                    <div class="loading" id="creditLoading">Loading...</div>
+                    <div class="response" id="creditResponse"></div>
+                </div>
+
+                <!-- Debit Account -->
+                <div class="section" style="background: #f8d7da;">
+                    <h3>💸 Debit Account (Withdrawal)</h3>
+                    <div class="form-group">
+                        <label>Account Number</label>
+                        <input type="text" id="debitAccountNumber" placeholder="e.g., ACC001" value="ACC001">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="debitAmount" placeholder="e.g., 100.00" value="100" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="debitDescription" placeholder="e.g., ATM" value="Test withdrawal">
+                    </div>
+                    <button style="background: #dc3545;" onclick="debitAccount()">Debit Account</button>
+                    <div class="loading" id="debitLoading">Loading...</div>
+                    <div class="response" id="debitResponse"></div>
+                </div>
+            </div>
+
+            <!-- Transaction Service Card -->
+            <div class="card">
+                <h2>💳 Transaction Service (Port 8082)</h2>
+                <div class="db-info">✓ Service: http://localhost:8082</div>
+
+                <!-- Health Check -->
+                <div class="section" style="background: #d4edda;">
+                    <h3>🏥 Health Check</h3>
+                    <button class="success" onclick="checkTransactionHealth()">Check Transaction Service</button>
+                    <div class="loading" id="transactionHealthLoading">Loading...</div>
+                    <div class="response" id="transactionHealthResponse"></div>
+                </div>
+
+                <!-- Transfer Funds -->
+                <div class="section" style="background: #d1ecf1;">
+                    <h3>🔄 Transfer Money Between Accounts</h3>
+                    <div class="form-group">
+                        <label>From Account Number</label>
+                        <input type="text" id="transferFrom" placeholder="e.g., ACC001" value="ACC001">
+                    </div>
+                    <div class="form-group">
+                        <label>To Account Number</label>
+                        <input type="text" id="transferTo" placeholder="e.g., ACC002" value="">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="transferAmount" placeholder="e.g., 250.00" value="250" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="transferDescription" placeholder="e.g., Payment" value="Transfer">
+                    </div>
+                    <button style="background: #ffc107; color: #000;" onclick="transferFunds()">Transfer Funds</button>
+                    <div class="loading" id="transferLoading">Loading...</div>
+                    <div class="response" id="transferResponse"></div>
+                </div>
+
+                <!-- Database Info -->
+                <div class="section">
+                    <h3>💾 Database Information</h3>
+                    <p style="font-size: 12px; color: #666; line-height: 1.6;">
+                        <strong>Account DB:</strong> account_db (Port 8081)<br>
+                        <strong>Transaction DB:</strong> transaction_db (Port 8082)<br>
+                        <strong>User:</strong> appuser<br>
+                        <strong>Password:</strong> password<br><br>
+                        <em>Sample data for testing:</em>
+                    </p>
+                    <div style="background: white; padding: 10px; border-radius: 3px; margin-top: 10px; font-family: monospace; font-size: 11px; overflow-x: auto;">
+INSERT INTO accounts VALUES<br>
+(1, 'ACC001', 1, 5000.00, 'ACTIVE', NOW(), NOW());
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8081';
+        const TRANSACTION_URL = 'http://localhost:8082';
+
+        async function makeRequest(method, endpoint, body = null, baseUrl = API_URL) {
+            try {
+                const options = {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    mode: 'cors'
+                };
+                if (body) options.body = JSON.stringify(body);
+
+                const response = await fetch(`${baseUrl}${endpoint}`, options);
+                const text = await response.text();
+                
+                // Try to parse as JSON, fallback to plain text
+                let data;
+                try {
+                    data = text ? JSON.parse(text) : text;
+                } catch (e) {
+                    // Not JSON, use plain text
+                    data = text;
+                }
+                
+                return { status: response.status, data: data, ok: response.ok };
+            } catch (error) {
+                return { status: 0, error: error.message, ok: false };
+            }
+        }
+
+        function showResponse(elementId, loadingId, result) {
+            document.getElementById(loadingId).style.display = 'none';
+            const element = document.getElementById(elementId);
+            element.classList.add('show');
+            
+            if (result.ok) {
+                element.classList.remove('error');
+                element.classList.add('success');
+                const displayData = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
+                element.innerHTML = `
+                    <h3>✓ Success</h3>
+                    <span class="status ok">HTTP ${result.status}</span>
+                    <pre>${displayData}</pre>
+                `;
+            } else {
+                element.classList.remove('success');
+                element.classList.add('error');
+                const errorMsg = result.error || (result.data ? (typeof result.data === 'string' ? result.data : JSON.stringify(result.data)) : 'Unknown error');
+                element.innerHTML = `
+                    <h3>✗ Error</h3>
+                    <span class="status error">HTTP ${result.status}</span>
+                    <pre>${errorMsg}</pre>
+                `;
+            }
+        }
+
+        async function getAccount() {
+            const accountNumber = document.getElementById('getAccountNumber').value;
+            document.getElementById('getLoading').style.display = 'block';
+            const result = await makeRequest('GET', `/api/accounts/${accountNumber}`);
+            showResponse('getResponse', 'getLoading', result);
+        }
+
+        async function getAllAccounts() {
+            document.getElementById('getAllLoading').style.display = 'block';
+            const result = await makeRequest('GET', `/api/accounts`);
+            showResponse('getAllResponse', 'getAllLoading', result);
+        }
+
+        async function checkAccountHealth() {
+            document.getElementById('accountHealthLoading').style.display = 'block';
+            const result = await makeRequest('GET', `/api/accounts`);
+            
+            // Convert the response to a health check format
+            if (result.ok || result.status === 200) {
+                result.data = { 
+                    status: 'UP', 
+                    service: 'Account Service',
+                    port: 8081,
+                    message: 'Service is running and responding',
+                    timestamp: new Date().toISOString()
+                };
+                result.ok = true;
+            } else if (result.status === 0) {
+                result.data = { 
+                    status: 'DOWN', 
+                    service: 'Account Service',
+                    port: 8081,
+                    message: 'Service is not reachable. Please check if it is running.',
+                    timestamp: new Date().toISOString()
+                };
+            }
+            showResponse('accountHealthResponse', 'accountHealthLoading', result);
+        }
+
+        async function creditAccount() {
+            const accountNumber = document.getElementById('creditAccountNumber').value.trim();
+            const amount = parseFloat(document.getElementById('creditAmount').value);
+            const description = document.getElementById('creditDescription').value.trim();
+
+            if (!accountNumber || !Number.isFinite(amount) || amount <= 0) {
+                showResponse('creditResponse', 'creditLoading', { ok: false, status: 0, error: 'Account number and positive amount are required.' });
+                return;
+            }
+
+            document.getElementById('creditLoading').style.display = 'block';
+            const body = { senderAccount: 'SYSTEM', amount: amount, description: description || 'Deposit' };
+            const result = await makeRequest('PUT', `/api/accounts/${accountNumber}/credit`, body);
+            showResponse('creditResponse', 'creditLoading', result);
+        }
+
+        async function debitAccount() {
+            const accountNumber = document.getElementById('debitAccountNumber').value.trim();
+            const amount = parseFloat(document.getElementById('debitAmount').value);
+            const description = document.getElementById('debitDescription').value.trim();
+
+            if (!accountNumber || !Number.isFinite(amount) || amount <= 0) {
+                showResponse('debitResponse', 'debitLoading', { ok: false, status: 0, error: 'Account number and positive amount are required.' });
+                return;
+            }
+
+            document.getElementById('debitLoading').style.display = 'block';
+            const body = { senderAccount: accountNumber, amount: amount, description: description || 'Withdrawal' };
+            const result = await makeRequest('PUT', `/api/accounts/${accountNumber}/debit`, body);
+            showResponse('debitResponse', 'debitLoading', result);
+        }
+
+        async function createAccount() {
+            const customerId = parseInt(document.getElementById('createCustomerId').value, 10);
+            const initialBalance = parseFloat(document.getElementById('createBalance').value);
+
+            if (!Number.isFinite(customerId) || customerId <= 0 || !Number.isFinite(initialBalance) || initialBalance <= 0) {
+                showResponse('createResponse', 'createLoading', { ok: false, status: 0, error: 'Customer ID and positive initial balance are required.' });
+                return;
+            }
+
+            document.getElementById('createLoading').style.display = 'block';
+            const body = { customerId: customerId, initialBalance: initialBalance };
+            const result = await makeRequest('POST', `/api/accounts`, body);
+            showResponse('createResponse', 'createLoading', result);
+        }
+
+        async function checkTransactionHealth() {
+            document.getElementById('transactionHealthLoading').style.display = 'block';
+            const result = await makeRequest('GET', `/health`, null, TRANSACTION_URL);
+            
+            // Since we're just checking if service responds, any response (even 405 for GET on POST endpoint) means it's up
+            if (result.ok || (result.status >= 200 && result.status < 500)) {
+                result.data = { 
+                    status: 'UP', 
+                    service: 'Transaction Service',
+                    port: 8082,
+                    message: 'Service is running and responding',
+                    timestamp: new Date().toISOString()
+                };
+                result.ok = true;
+            } else if (result.status === 0) {
+                result.data = { 
+                    status: 'DOWN', 
+                    service: 'Transaction Service',
+                    port: 8082,
+                    message: 'Service is not reachable. Please check if it is running.',
+                    timestamp: new Date().toISOString()
+                };
+            }
+            showResponse('transactionHealthResponse', 'transactionHealthLoading', result);
+        }
+
+        async function transferFunds() {
+            const fromAccount = document.getElementById('transferFrom').value.trim();
+            const toAccount = document.getElementById('transferTo').value.trim();
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+            const description = document.getElementById('transferDescription').value.trim();
+
+            if (!fromAccount || !toAccount || !Number.isFinite(amount) || amount <= 0) {
+                showResponse('transferResponse', 'transferLoading', { ok: false, status: 0, error: 'From, To, and positive amount are required.' });
+                return;
+            }
+
+            document.getElementById('transferLoading').style.display = 'block';
+            const body = {
+                fromAccountNumber: fromAccount,
+                toAccountNumber: toAccount,
+                amount: amount,
+                description: description || 'Transfer'
+            };
+            const result = await makeRequest('POST', `/api/transactions/transfer`, body, TRANSACTION_URL);
+            showResponse('transferResponse', 'transferLoading', result);
+        }
+    </script>
+</body>
+</html>
