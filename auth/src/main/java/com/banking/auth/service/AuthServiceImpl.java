@@ -6,7 +6,6 @@ import com.banking.auth.dto.RegisterRequestDTO;
 import com.banking.auth.entity.User;
 import com.banking.auth.exception.UserAlreadyExistsException;
 import com.banking.auth.repository.UserRepository;
-import com.banking.auth.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,7 +22,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final UnifiedJwtService unifiedJwtService;
 
     @Override
     @Transactional
@@ -51,7 +50,7 @@ public class AuthServiceImpl implements AuthService {
                         registerRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtTokenProvider.generateToken(authentication);
+        String jwt = unifiedJwtService.generateToken(authentication);
 
         return new AuthResponseDTO(jwt, user.getUsername(), user.getEmail(), user.getRole().name());
     }
@@ -65,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
                         loginRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtTokenProvider.generateToken(authentication);
+        String jwt = unifiedJwtService.generateToken(authentication);
 
         User user = userRepository.findByUsername(loginRequest.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -75,6 +74,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Boolean validateToken(String token) {
-        return jwtTokenProvider.validateToken(token);
+        return unifiedJwtService.validateToken(token);
     }
 }

@@ -1,73 +1,66 @@
-package com.banking.transaction.security;
+package com.banking.auth.security;
 
+import com.banking.auth.service.UserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
+/**
+ * Hybrid JWT Authentication Filter that supports both standard and Post-Quantum
+ * JWT tokens.
+ * Automatically detects which provider to use based on configuration.
+ */
 @Component
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
+public class HybridJwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired
-    private JwtTokenProvider standardTokenProvider;
+    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    private PQJwtTokenProvider pqTokenProvider;
+    private PQJwtTokenProvider pqJwtTokenProvider;
+
+    @Autowired
+    private UserDetailsServiceImpl userDetailsService;
 
     @Value("${jwt.use-post-quantum:false}")
     private boolean usePostQuantum;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt)) {
-                String username = null;
-                boolean isValid = false;
+                String username;
+                boolean isValid;
 
-                // Try PQ validation first if enabled
+                // Try to validate with the configured provider
                 if (usePostQuantum) {
-                    try {
-                        isValid = pqTokenProvider.validateToken(jwt);
-                        if (isValid) {
-                            username = pqTokenProvider.getUsernameFromToken(jwt);
-                            logger.debug("Validated PQ JWT for user: " + username);
-                        }
-                    } catch (Exception e) {
-                        logger.debug("PQ JWT validation failed, trying standard JWT: " + e.getMessage());
-                    }
-                }
-
-                // Fallback to standard JWT
-                if (!isValid) {
-                    try {
-                        if (standardTokenProvider.validateToken(jwt)) {
-                            username = standardTokenProvider.getUsernameFromToken(jwt);
-                            logger.debug("Validated standard JWT for user: " + username);
-                            isValid = true;
-                        }
-                    } catch (Exception e) {
-                        logger.debug("Standard JWT validation failed: " + e.getMessage());
-                    }
+                    isValid = pqJwtTokenProvider.validateToken(jwt);
+                    username = isValid ? pqJwtTokenProvider.getUsernameFromToken(jwt) : null;
+                } else {
+                    isValid = jwtTokenProvider.validateToken(jwt);
+                    username = isValid ? jwtTokenProvider.getUsernameFromToken(jwt) : null;
                 }
 
                 if (isValid && username != null) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            username, null, new ArrayList<>());
+                            userDetails, null, userDetails.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
