@@ -24,6 +24,11 @@ public class AccountController {
         this.accountService = accountService;
     }
 
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Account Service is UP");
+    }
+
     @GetMapping("/{accountNumber}")
     public ResponseEntity<AccountDTO> getAccount(@PathVariable String accountNumber) {
         AccountDTO accountDTO = accountService.getAccountByAccountNumber(accountNumber);
@@ -31,13 +36,15 @@ public class AccountController {
     }
 
     @PutMapping("/{accountNumber}/debit")
-    public ResponseEntity<String> debitAccount(@PathVariable String accountNumber, @Valid @RequestBody DebitRequestDTO debitRequest) {
+    public ResponseEntity<String> debitAccount(@PathVariable String accountNumber,
+            @Valid @RequestBody DebitRequestDTO debitRequest) {
         accountService.debitAccount(accountNumber, debitRequest);
         return ResponseEntity.ok("Debit successful");
     }
 
     @PutMapping("/{accountNumber}/credit")
-    public ResponseEntity<String> creditAccount(@PathVariable String accountNumber, @Valid @RequestBody CreditRequestDTO creditRequest) {
+    public ResponseEntity<String> creditAccount(@PathVariable String accountNumber,
+            @Valid @RequestBody CreditRequestDTO creditRequest) {
         accountService.creditAccount(accountNumber, creditRequest);
         return ResponseEntity.ok("Credit successful");
     }
@@ -51,6 +58,12 @@ public class AccountController {
     @GetMapping
     public ResponseEntity<java.util.List<AccountDTO>> getAllAccounts() {
         java.util.List<AccountDTO> accounts = accountService.getAllAccounts();
+        return ResponseEntity.ok(accounts);
+    }
+
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<java.util.List<AccountDTO>> getAccountsByCustomer(@PathVariable Long customerId) {
+        java.util.List<AccountDTO> accounts = accountService.getAccountsByCustomerId(customerId);
         return ResponseEntity.ok(accounts);
     }
 }

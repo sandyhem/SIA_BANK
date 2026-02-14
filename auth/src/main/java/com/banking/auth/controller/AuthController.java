@@ -3,6 +3,7 @@ package com.banking.auth.controller;
 import com.banking.auth.dto.AuthResponseDTO;
 import com.banking.auth.dto.LoginRequestDTO;
 import com.banking.auth.dto.RegisterRequestDTO;
+import com.banking.auth.dto.UserKycDTO;
 import com.banking.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,5 +42,11 @@ public class AuthController {
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
         return ResponseEntity.ok(Map.of("status", "UP", "service", "auth-service"));
+    }
+
+    @GetMapping("/user/{userId}/kyc-status")
+    public ResponseEntity<UserKycDTO> getUserKycStatus(@PathVariable Long userId) {
+        UserKycDTO userKyc = authService.getUserKycStatus(userId);
+        return ResponseEntity.ok(userKyc);
     }
 }

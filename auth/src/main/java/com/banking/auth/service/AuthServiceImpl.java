@@ -3,6 +3,7 @@ package com.banking.auth.service;
 import com.banking.auth.dto.AuthResponseDTO;
 import com.banking.auth.dto.LoginRequestDTO;
 import com.banking.auth.dto.RegisterRequestDTO;
+import com.banking.auth.dto.UserKycDTO;
 import com.banking.auth.entity.User;
 import com.banking.auth.exception.UserAlreadyExistsException;
 import com.banking.auth.repository.UserRepository;
@@ -38,8 +39,12 @@ public class AuthServiceImpl implements AuthService {
         User user = new User();
         user.setUsername(registerRequest.getUsername());
         user.setEmail(registerRequest.getEmail());
+        user.setFirstName(registerRequest.getFirstName());
+        user.setLastName(registerRequest.getLastName());
+        user.setPhone(registerRequest.getPhone());
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         user.setRole(registerRequest.getRole());
+        user.setKycStatus("pending");
         user.setEnabled(true);
 
         userRepository.save(user);
@@ -52,7 +57,10 @@ public class AuthServiceImpl implements AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = unifiedJwtService.generateToken(authentication);
 
-        return new AuthResponseDTO(jwt, user.getUsername(), user.getEmail(), user.getRole().name());
+        return new AuthResponseDTO(jwt, user.getId(), user.getUsername(), user.getEmail(),
+                user.getName(), user.getFirstName(), user.getLastName(),
+                user.getPhone(), user.getCustomerId(), user.getKycStatus(),
+                user.getRole().name());
     }
 
     @Override
@@ -69,11 +77,27 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByUsername(loginRequest.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return new AuthResponseDTO(jwt, user.getUsername(), user.getEmail(), user.getRole().name());
+        return new AuthResponseDTO(jwt, user.getId(), user.getUsername(), user.getEmail(),
+                user.getName(), user.getFirstName(), user.getLastName(),
+                user.getPhone(), user.getCustomerId(), user.getKycStatus(),
+                user.getRole().name());
     }
 
     @Override
     public Boolean validateToken(String token) {
         return unifiedJwtService.validateToken(token);
+    }
+
+    @Override
+    public UserKycDTO getUserKycStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+
+        return UserKycDTO.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .kycStatus(user.getKycStatus())
+                .customerId(user.getCustomerId())
+                .build();
     }
 }

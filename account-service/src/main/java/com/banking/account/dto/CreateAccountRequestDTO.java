@@ -14,11 +14,15 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateAccountRequestDTO {
-    
-    @NotNull(message = "Customer ID is required")
-    private Long customerId;
-    
+
+    @NotNull(message = "User ID is required")
+    private Long userId; // The authenticated user ID
+
     @NotNull(message = "Initial balance is required")
     @Positive(message = "Initial balance must be positive")
     private BigDecimal initialBalance;
+
+    private String accountName;
+
+    private String accountType = "SAVINGS"; // Default to SAVINGS
 }

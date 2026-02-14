@@ -9,23 +9,24 @@ import com.banking.transaction.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @Transactional
 public class TransactionService {
-    
+
     private final AccountServiceClient accountServiceClient;
     private final TransactionRepository transactionRepository;
-    
+
     public TransactionService(AccountServiceClient accountServiceClient, TransactionRepository transactionRepository) {
         this.accountServiceClient = accountServiceClient;
         this.transactionRepository = transactionRepository;
     }
-    
+
     public String transferFunds(TransferRequestDTO transferRequest) {
         String transactionId = "TXN" + UUID.randomUUID().toString().substring(0, 12).toUpperCase();
-        
+
         try {
             // Debit from source account
             DebitRequestDTO debitRequest = DebitRequestDTO.builder()
@@ -34,7 +35,7 @@ public class TransactionService {
                     .description(transferRequest.getDescription())
                     .build();
             accountServiceClient.debitAccount(transferRequest.getFromAccountNumber(), debitRequest);
-            
+
             // Credit to destination account
             CreditRequestDTO creditRequest = CreditRequestDTO.builder()
                     .senderAccount(transferRequest.getFromAccountNumber())
@@ -42,7 +43,7 @@ public class TransactionService {
                     .description(transferRequest.getDescription())
                     .build();
             accountServiceClient.creditAccount(transferRequest.getToAccountNumber(), creditRequest);
-            
+
             // Log successful transaction
             Transaction transaction = new Transaction();
             transaction.setTransactionId(transactionId);
@@ -52,7 +53,7 @@ public class TransactionService {
             transaction.setDescription(transferRequest.getDescription());
             transaction.setStatus("SUCCESS");
             transactionRepository.save(transaction);
-            
+
             return "Transfer successful. Transaction ID: " + transactionId;
         } catch (Exception e) {
             // Log failed transaction
@@ -64,8 +65,12 @@ public class TransactionService {
             transaction.setDescription(transferRequest.getDescription());
             transaction.setStatus("FAILED");
             transactionRepository.save(transaction);
-            
+
             throw new RuntimeException("Transfer failed: " + e.getMessage());
         }
+    }
+
+    public List<Transaction> getTransactionsByAccount(String accountNumber) {
+        return transactionRepository.findByFromAccountNumberOrToAccountNumber(accountNumber, accountNumber);
     }
 }

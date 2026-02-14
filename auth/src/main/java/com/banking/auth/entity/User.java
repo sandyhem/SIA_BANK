@@ -27,6 +27,21 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Column(name = "first_name", nullable = false)
+    private String firstName;
+
+    @Column(name = "last_name", nullable = false)
+    private String lastName;
+
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "customer_id", unique = true)
+    private String customerId;
+
+    @Column(name = "kyc_status")
+    private String kycStatus = "pending";
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
@@ -44,6 +59,19 @@ public class User {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (customerId == null || customerId.isEmpty()) {
+            customerId = generateCustomerId();
+        }
+    }
+
+    private String generateCustomerId() {
+        return "QB" + createdAt.getYear() + "-" +
+                String.format("%04d", (int) (Math.random() * 10000));
+    }
+
+    @Transient
+    public String getName() {
+        return firstName + " " + lastName;
     }
 
     @PreUpdate

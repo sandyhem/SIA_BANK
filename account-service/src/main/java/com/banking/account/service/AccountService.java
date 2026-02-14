@@ -9,8 +9,14 @@ import java.util.List;
 
 public interface AccountService {
     AccountDTO getAccountByAccountNumber(String accountNumber);
+
     void creditAccount(String accountNumber, CreditRequestDTO creditRequest);
+
     void debitAccount(String accountNumber, DebitRequestDTO debitRequest);
+
     AccountDTO createAccount(CreateAccountRequestDTO createRequest);
+
     List<AccountDTO> getAllAccounts();
+
+    List<AccountDTO> getAccountsByCustomerId(Long customerId);
 }

@@ -25,5 +25,13 @@ public class RegisterRequestDTO {
     @Email(message = "Email should be valid")
     private String email;
 
+    @NotBlank(message = "First name is required")
+    private String firstName;
+
+    @NotBlank(message = "Last name is required")
+    private String lastName;
+
+    private String phone;
+
     private Role role = Role.USER;
 }

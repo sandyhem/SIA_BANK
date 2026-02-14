@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIA Bank - Complete Test Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header .status {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-item.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-item.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-item.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover {
+            background: #5a6268;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #218838;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        .response {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .response.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .response.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .response.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .info-box strong {
+            color: #1976D2;
+        }
+
+        .accounts-list {
+            margin-top: 15px;
+        }
+
+        .account-item {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+
+        .account-item strong {
+            color: #667eea;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #666;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .kyc-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .kyc-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .kyc-badge.verified {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .kyc-badge.rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .user-info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            padding: 8px 15px;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 SIA Bank - Complete Test Interface</h1>
+            <p style="color: #666; margin-top: 5px;">Banking Flow: User Registration → Customer (CIF) → KYC Verification
+                → Account Opening → Transactions</p>
+            <div class="status" id="servicesStatus">
+                <span class="status-item" id="authStatus">Auth Service: Checking...</span>
+                <span class="status-item" id="accountStatus">Account Service: Checking...</span>
+                <span class="status-item" id="transactionStatus">Transaction Service: Checking...</span>
+            </div>
+        </div>
+
+        <!-- User Session Info -->
+        <div id="userSession" class="card hidden">
+            <h2>👤 Current Session</h2>
+            <div class="user-info">
+                <p><strong>User ID:</strong> <span id="sessionUserId">-</span></p>
+                <p><strong>Username:</strong> <span id="sessionUsername">-</span></p>
+                <p><strong>CIF Number:</strong> <span id="sessionCifNumber">-</span></p>
+                <p><strong>KYC Status:</strong> <span id="sessionKycStatus">-</span></p>
+                <p><strong>Customer Status:</strong> <span id="sessionCustomerStatus">-</span></p>
+                <p><strong>Token:</strong> <span id="sessionToken"
+                        style="font-size: 11px; word-break: break-all;">-</span></p>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="grid">
+            <!-- Authentication Section -->
+            <div class="card" id="authCard">
+                <h2>🔐 Authentication</h2>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchAuthTab('register')">Register</button>
+                    <button class="tab" onclick="switchAuthTab('login')">Login</button>
+                </div>
+
+                <!-- Register Tab -->
+                <div id="registerTab" class="tab-content active">
+                    <div class="info-box">
+                        <strong>Step 1:</strong> Create a new user account. Default KYC status will be PENDING.
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="regUsername" placeholder="testuser123">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="regEmail" placeholder="user@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="regPassword" placeholder="Test@123">
+                    </div>
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="regFirstName" placeholder="John">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="regLastName" placeholder="Doe">
+                    </div>
+                    <button onclick="register()">Register User</button>
+                    <div id="registerResponse"></div>
+                </div>
+
+                <!-- Login Tab -->
+                <div id="loginTab" class="tab-content">
+                    <div class="info-box">
+                        <strong>Step 2:</strong> Login with your credentials to get JWT token.
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="loginUsername" placeholder="testuser123">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPassword" placeholder="Test@123">
+                    </div>
+                    <button onclick="login()">Login</button>
+                    <div id="loginResponse"></div>
+                </div>
+            </div>
+
+            <!-- Customer Profile (CIF) -->
+            <div class="card">
+                <h2>📋 Customer Profile (CIF)</h2>
+                <div class="info-box">
+                    <strong>Step 2:</strong> Create Customer Information File (CIF). Required before opening
+                    accounts.<br>
+                    <em style="color: #666; font-size: 12px;">⚠️ Make sure you're logged in first! Open browser console
+                        (F12) to see detailed logs.</em>
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="cifFullName" placeholder="John Michael Doe">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="text" id="cifPhone" placeholder="9876543210">
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="cifAddress" placeholder="123 Test Street, Apartment 4B">
+                </div>
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" id="cifCity" placeholder="Mumbai">
+                </div>
+                <div class="form-group">
+                    <label>State</label>
+                    <input type="text" id="cifState" placeholder="Maharashtra">
+                </div>
+                <div class="form-group">
+                    <label>Postal Code</label>
+                    <input type="text" id="cifPostalCode" placeholder="400001">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" id="cifCountry" placeholder="India" value="India">
+                </div>
+                <div class="form-group">
+                    <label>PAN Number</label>
+                    <input type="text" id="cifPan" placeholder="ABCDE1234F">
+                </div>
+                <div class="form-group">
+                    <label>Aadhaar Number</label>
+                    <input type="text" id="cifAadhaar" placeholder="123456789012">
+                </div>
+                <button onclick="createCustomer()">Create Customer Profile (CIF)</button>
+                <button class="secondary" onclick="viewCustomer()">View My Customer Profile</button>
+                <div id="customerResponse"></div>
+            </div>
+
+            <!-- KYC Management -->
+            <div class="card">
+                <h2>✅ KYC Verification (Admin)</h2>
+                <div class="info-box">
+                    <strong>Step 3:</strong> Update KYC status to VERIFIED. Customer must be ACTIVE to open accounts.
+                </div>
+                <div class="form-group">
+                    <label>CIF Number</label>
+                    <input type="text" id="kycCifNumber" placeholder="CIF2026-1234">
+                </div>
+                <div class="form-group">
+                    <label>New KYC Status</label>
+                    <select id="kycStatus">
+                        <option value="VERIFIED">VERIFIED ✅</option>
+                        <option value="UNDER_REVIEW">UNDER REVIEW 🔍</option>
+                        <option value="PENDING">PENDING ⏳</option>
+                        <option value="REJECTED">REJECTED ❌</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Admin Username</label>
+                    <input type="text" id="kycAdminUsername" placeholder="admin_test" value="admin_test">
+                </div>
+                <button class="success" onclick="updateKycStatus()">Update KYC Status</button>
+                <div id="kycResponse"></div>
+            </div>
+
+            <!-- Account Creation -->
+            <div class="card">
+                <h2>💰 Account Creation</h2>
+                <div class="info-box">
+                    <strong>Step 4:</strong> Create bank account. Requires KYC VERIFIED and Customer ACTIVE status.
+                </div>
+                <div class="form-group">
+                    <label>Account Name</label>
+                    <input type="text" id="accountName" placeholder="My Savings Account">
+                </div>
+                <div class="form-group">
+                    <label>Account Type</label>
+                    <select id="accountType">
+                        <option value="SAVINGS">Savings</option>
+                        <option value="CHECKING">Checking</option>
+                        <option value="FIXED_DEPOSIT">Fixed Deposit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Initial Balance</label>
+                    <input type="number" id="initialBalance" placeholder="1000" step="0.01">
+                </div>
+                <button onclick="createAccount()">Create Account</button>
+                <button class="secondary" onclick="listAccounts()">List My Accounts</button>
+                <div id="accountResponse"></div>
+            </div>
+
+            <!-- Transactions -->
+            <div class="card">
+                <h2>💸 Transactions</h2>
+                <div class="info-box">
+                    <strong>Step 5:</strong> Perform transactions on accounts.
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTransactionTab('credit')">Credit</button>
+                    <button class="tab" onclick="switchTransactionTab('debit')">Debit</button>
+                    <button class="tab" onclick="switchTransactionTab('transfer')">Transfer</button>
+                </div>
+
+                <!-- Credit Tab -->
+                <div id="creditTab" class="tab-content active">
+                    <div class="form-group">
+                        <label>Account Number</label>
+                        <input type="text" id="creditAccountNumber" placeholder="ACC12345678">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="creditAmount" placeholder="500" step="0.01">
+                    </div>
+                    <button class="success" onclick="creditAccount()">Credit Account</button>
+                </div>
+
+                <!-- Debit Tab -->
+                <div id="debitTab" class="tab-content">
+                    <div class="form-group">
+                        <label>Account Number</label>
+                        <input type="text" id="debitAccountNumber" placeholder="ACC12345678">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="debitAmount" placeholder="200" step="0.01">
+                    </div>
+                    <button class="danger" onclick="debitAccount()">Debit Account</button>
+                </div>
+
+                <!-- Transfer Tab -->
+                <div id="transferTab" class="tab-content">
+                    <div class="form-group">
+                        <label>From Account</label>
+                        <input type="text" id="transferFromAccount" placeholder="ACC12345678">
+                    </div>
+                    <div class="form-group">
+                        <label>To Account</label>
+                        <input type="text" id="transferToAccount" placeholder="ACC87654321">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="transferAmount" placeholder="300" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Description (Optional)</label>
+                        <input type="text" id="transferDescription" placeholder="Payment for services">
+                    </div>
+                    <button onclick="transferMoney()">Transfer Money</button>
+                </div>
+
+                <div id="transactionResponse"></div>
+            </div>
+
+            <!-- Account Details -->
+            <div class="card">
+                <h2>📊 Account Details</h2>
+                <div class="form-group">
+                    <label>Account Number</label>
+                    <input type="text" id="viewAccountNumber" placeholder="ACC12345678">
+                </div>
+                <button onclick="viewAccount()">View Account</button>
+                <div id="viewAccountResponse"></div>
+            </div>
+
+            <!-- Transaction History -->
+            <div class="card">
+                <h2>📜 Transaction History</h2>
+                <div class="form-group">
+                    <label>Account Number</label>
+                    <input type="text" id="historyAccountNumber" placeholder="ACC12345678">
+                </div>
+                <button onclick="getTransactionHistory()">Get Transaction History</button>
+                <div id="historyResponse"></div>
+            </div>
+
+            <!-- View All Customer Details -->
+            <div class="card">
+                <h2>👥 All Customer & Account Details</h2>
+                <button onclick="getAllCustomerDetails()" class="success">Load All Customer Details</button>
+                <div id="allCustomersResponse" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = {
+            auth: 'http://localhost:8083/auth/api/auth',
+            customers: 'http://localhost:8083/auth/api/customers',
+            accounts: 'http://localhost:8081/api/accounts',
+            transactions: 'http://localhost:8082/api/transactions'
+        };
+
+        let currentToken = null;
+        let currentUser = null;
+
+        // Check services on load
+        window.onload = () => {
+            checkServices();
+        };
+
+        // Check service health
+        async function checkServices() {
+            const services = [
+                { id: 'authStatus', url: `${API_BASE.auth}/health`, name: 'Auth Service' },
+                { id: 'accountStatus', url: `${API_BASE.accounts}/health`, name: 'Account Service' },
+                { id: 'transactionStatus', url: `${API_BASE.transactions}/health`, name: 'Transaction Service' }
+            ];
+
+            for (const service of services) {
+                try {
+                    const response = await fetch(service.url);
+                    const element = document.getElementById(service.id);
+                    if (response.ok) {
+                        element.textContent = `${service.name}: UP`;
+                        element.className = 'status-item success';
+                    } else {
+                        element.textContent = `${service.name}: DOWN`;
+                        element.className = 'status-item error';
+                    }
+                } catch (error) {
+                    const element = document.getElementById(service.id);
+                    element.textContent = `${service.name}: ERROR`;
+                    element.className = 'status-item error';
+                }
+            }
+        }
+
+        // Tab switching
+        function switchAuthTab(tab) {
+            document.querySelectorAll('#authCard .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#authCard .tab-content').forEach(t => t.classList.remove('active'));
+
+            if (tab === 'register') {
+                document.querySelector('#authCard .tab:nth-child(1)').classList.add('active');
+                document.getElementById('registerTab').classList.add('active');
+            } else {
+                document.querySelector('#authCard .tab:nth-child(2)').classList.add('active');
+                document.getElementById('loginTab').classList.add('active');
+            }
+        }
+
+        function switchTransactionTab(tab) {
+            document.querySelectorAll('.card:last-of-type .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.card:last-of-type .tab-content').forEach(t => t.classList.remove('active'));
+
+            const tabs = { credit: 0, debit: 1, transfer: 2 };
+            const index = tabs[tab];
+            const tabElements = document.querySelectorAll('.card:last-of-type .tab');
+            if (tabElements[index]) {
+                tabElements[index].classList.add('active');
+            }
+            const contentElement = document.getElementById(`${tab}Tab`);
+            if (contentElement) {
+                contentElement.classList.add('active');
+            }
+        }
+
+        // Display response
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.className = `response ${isError ? 'error' : 'success'}`;
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        // Update session display
+        function updateSessionDisplay(userData) {
+            currentUser = userData;
+            document.getElementById('userSession').classList.remove('hidden');
+            document.getElementById('sessionUserId').textContent = userData.userId || '-';
+            document.getElementById('sessionUsername').textContent = userData.username || '-';
+
+            const cifSpan = document.getElementById('sessionCifNumber');
+            cifSpan.textContent = userData.cifNumber || 'Not created';
+
+            const kycSpan = document.getElementById('sessionKycStatus');
+            const kycStatus = userData.kycStatus || 'UNKNOWN';
+            kycSpan.innerHTML = `<span class="kyc-badge ${kycStatus.toLowerCase()}">${kycStatus}</span>`;
+
+            const customerSpan = document.getElementById('sessionCustomerStatus');
+            const customerStatus = userData.customerStatus || 'N/A';
+            customerSpan.innerHTML = `<span class="kyc-badge ${customerStatus === 'ACTIVE' ? 'verified' : 'pending'}">${customerStatus}</span>`;
+
+            const tokenDisplay = currentToken ? currentToken.substring(0, 50) + '...' : '-';
+            document.getElementById('sessionToken').textContent = tokenDisplay;
+
+            // Auto-fill forms
+            if (userData.cifNumber) {
+                document.getElementById('kycCifNumber').value = userData.cifNumber;
+            }
+        }
+
+        // Logout
+        function logout() {
+            currentToken = null;
+            currentUser = null;
+            document.getElementById('userSession').classList.add('hidden');
+            showResponse('loginResponse', 'Logged out successfully', false);
+        }
+
+        // Authentication
+        async function register() {
+            const data = {
+                username: document.getElementById('regUsername').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value,
+                firstName: document.getElementById('regFirstName').value,
+                lastName: document.getElementById('regLastName').value
+            };
+
+            console.log('📝 Registering user:', data.username);
+
+            try {
+                const response = await fetch(`${API_BASE.auth}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                console.log('📡 Register Response:', result);
+
+                if (response.ok) {
+                    currentToken = result.token;
+                    console.log('✅ User registered. Token:', currentToken ? currentToken.substring(0, 30) + '...' : 'NONE');
+                    updateSessionDisplay(result);
+                    showResponse('registerResponse', result);
+
+                    // Auto-fill login and customer forms
+                    document.getElementById('loginUsername').value = data.username;
+                    document.getElementById('cifFullName').value = `${data.firstName} ${data.lastName}`;
+                } else {
+                    console.error('❌ Registration failed:', result);
+                    showResponse('registerResponse', result, true);
+                }
+            } catch (error) {
+                console.error('💥 Registration error:', error);
+                showResponse('registerResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function login() {
+            const data = {
+                username: document.getElementById('loginUsername').value,
+                password: document.getElementById('loginPassword').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE.auth}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    currentToken = result.token;
+                    updateSessionDisplay(result);
+                    showResponse('loginResponse', result);
+                } else {
+                    showResponse('loginResponse', result, true);
+                }
+            } catch (error) {
+                showResponse('loginResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Customer Management (CIF)
+        async function createCustomer() {
+            console.log('=== CREATE CUSTOMER CALLED ===');
+
+            if (!currentToken) {
+                console.error('❌ No token available');
+                showResponse('customerResponse', '❌ Please login first!', true);
+                return;
+            }
+
+            if (!currentUser || !currentUser.userId) {
+                console.error('❌ No user ID available');
+                showResponse('customerResponse', '❌ User ID not available. Please login again.', true);
+                return;
+            }
+
+            const data = {
+                fullName: document.getElementById('cifFullName').value,
+                phone: document.getElementById('cifPhone').value,
+                address: document.getElementById('cifAddress').value,
+                city: document.getElementById('cifCity').value,
+                state: document.getElementById('cifState').value,
+                postalCode: document.getElementById('cifPostalCode').value,
+                country: document.getElementById('cifCountry').value,
+                panNumber: document.getElementById('cifPan').value,
+                aadhaarNumber: document.getElementById('cifAadhaar').value,
+                dateOfBirth: '1990-01-01'  // Default value
+            };
+
+            console.log('📋 Customer Data:', data);
+            console.log('👤 User ID:', currentUser.userId);
+            console.log('🔑 Token:', currentToken ? currentToken.substring(0, 30) + '...' : 'NONE');
+
+            const url = `${API_BASE.customers}?userId=${currentUser.userId}`;
+            console.log('🌐 Request URL:', url);
+
+            try {
+                showResponse('customerResponse', '⏳ Creating customer profile...', false);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                console.log('📡 Response Status:', response.status, response.statusText);
+
+                const result = await response.json();
+                console.log('📦 Response Data:', result);
+
+                if (response.ok) {
+                    console.log('✅ Customer created successfully!');
+                    showResponse('customerResponse', result);
+                    // Update session with CIF info
+                    currentUser.cifNumber = result.cifNumber;
+                    currentUser.kycStatus = result.kycStatus;
+                    currentUser.customerStatus = result.customerStatus;
+                    updateSessionDisplay(currentUser);
+                } else {
+                    console.error('❌ Failed to create customer:', result);
+                    showResponse('customerResponse', result, true);
+                }
+            } catch (error) {
+                console.error('💥 Exception:', error);
+                showResponse('customerResponse', `❌ Error: ${error.message}\n\nCheck browser console (F12) for details.`, true);
+            }
+        }
+
+        async function viewCustomer() {
+            console.log('=== VIEW CUSTOMER CALLED ===');
+
+            if (!currentToken) {
+                console.error('❌ No token available');
+                showResponse('customerResponse', '❌ Please login first!', true);
+                return;
+            }
+
+            if (!currentUser || !currentUser.userId) {
+                console.error('❌ No user ID available');
+                showResponse('customerResponse', '❌ User ID not available. Please login again.', true);
+                return;
+            }
+
+            const url = `${API_BASE.customers}/user/${currentUser.userId}`;
+            console.log('🌐 Request URL:', url);
+
+            try {
+                showResponse('customerResponse', '⏳ Fetching customer profile...', false);
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                console.log('📡 Response Status:', response.status, response.statusText);
+                const result = await response.json();
+                console.log('📦 Response Data:', result);
+
+                if (response.ok) {
+                    console.log('✅ Customer retrieved successfully!');
+                    showResponse('customerResponse', result);
+                    // Update session with latest CIF info
+                    currentUser.cifNumber = result.cifNumber;
+                    currentUser.kycStatus = result.kycStatus;
+                    currentUser.customerStatus = result.customerStatus;
+                    updateSessionDisplay(currentUser);
+                } else {
+                    console.error('❌ Failed to retrieve customer:', result);
+                    showResponse('customerResponse', result, true);
+                }
+            } catch (error) {
+                console.error('💥 Exception:', error);
+                showResponse('customerResponse', `❌ Error: ${error.message}\n\nCheck browser console (F12) for details.`, true);
+            }
+        }
+
+        // KYC Management
+        async function updateKycStatus() {
+            if (!currentToken) {
+                showResponse('kycResponse', 'Please login first!', true);
+                return;
+            }
+
+            const cifNumber = document.getElementById('kycCifNumber').value;
+            const status = document.getElementById('kycStatus').value;
+            const adminUsername = document.getElementById('kycAdminUsername').value;
+
+            const data = {
+                kycStatus: status
+            };
+
+            try {
+                const response = await fetch(`${API_BASE.customers}/cif/${cifNumber}/kyc?adminUsername=${adminUsername}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResponse('kycResponse', result);
+                    // If this is the current user's CIF, update session
+                    if (result.userId === currentUser.userId) {
+                        currentUser.kycStatus = result.kycStatus;
+                        currentUser.customerStatus = result.customerStatus;
+                        updateSessionDisplay(currentUser);
+                    }
+                } else {
+                    showResponse('kycResponse', result, true);
+                }
+            } catch (error) {
+                showResponse('kycResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Account Management
+        async function createAccount() {
+            if (!currentToken) {
+                showResponse('accountResponse', 'Please login first!', true);
+                return;
+            }
+
+            if (!currentUser || !currentUser.userId) {
+                showResponse('accountResponse', 'User ID not available. Please login again.', true);
+                return;
+            }
+
+            const data = {
+                userId: currentUser.userId,
+                accountName: document.getElementById('accountName').value,
+                accountType: document.getElementById('accountType').value,
+                initialBalance: parseFloat(document.getElementById('initialBalance').value)
+            };
+
+            try {
+                const response = await fetch(`${API_BASE.accounts}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResponse('accountResponse', result);
+                    // Auto-fill account numbers in transaction fields
+                    document.getElementById('creditAccountNumber').value = result.accountNumber;
+                    document.getElementById('debitAccountNumber').value = result.accountNumber;
+                    document.getElementById('transferFromAccount').value = result.accountNumber;
+                    document.getElementById('viewAccountNumber').value = result.accountNumber;
+                    document.getElementById('historyAccountNumber').value = result.accountNumber;
+                } else {
+                    showResponse('accountResponse', result, true);
+                }
+            } catch (error) {
+                showResponse('accountResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function listAccounts() {
+            if (!currentToken) {
+                showResponse('accountResponse', 'Please login first!', true);
+                return;
+            }
+
+            showResponse('accountResponse', 'List accounts endpoint: Use "View Account" with specific account number, or query by userId in database.', false);
+        }
+
+        async function viewAccount() {
+            if (!currentToken) {
+                showResponse('viewAccountResponse', 'Please login first!', true);
+                return;
+            }
+
+            const accountNumber = document.getElementById('viewAccountNumber').value;
+
+            try {
+                const response = await fetch(`${API_BASE.accounts}/${accountNumber}`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResponse('viewAccountResponse', result);
+                } else {
+                    showResponse('viewAccountResponse', result, true);
+                }
+            } catch (error) {
+                showResponse('viewAccountResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Transactions
+        async function creditAccount() {
+            if (!currentToken) {
+                showResponse('transactionResponse', 'Please login first!', true);
+                return;
+            }
+
+            const accountNumber = document.getElementById('creditAccountNumber').value;
+            const amount = parseFloat(document.getElementById('creditAmount').value);
+
+            try {
+                const response = await fetch(`${API_BASE.accounts}/${accountNumber}/credit`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({
+                        senderAccount: accountNumber,
+                        amount: amount,
+                        description: 'Credit via test UI'
+                    })
+                });
+
+                const result = response.ok ? await response.text() : await response.json();
+                showResponse('transactionResponse', result, !response.ok);
+            } catch (error) {
+                showResponse('transactionResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function debitAccount() {
+            if (!currentToken) {
+                showResponse('transactionResponse', 'Please login first!', true);
+                return;
+            }
+
+            const accountNumber = document.getElementById('debitAccountNumber').value;
+            const amount = parseFloat(document.getElementById('debitAmount').value);
+
+            try {
+                const response = await fetch(`${API_BASE.accounts}/${accountNumber}/debit`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({
+                        amount: amount,
+                        description: 'Debit via test UI'
+                    })
+                });
+
+                const result = response.ok ? await response.text() : await response.json();
+                showResponse('transactionResponse', result, !response.ok);
+            } catch (error) {
+                showResponse('transactionResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function transferMoney() {
+            if (!currentToken) {
+                showResponse('transactionResponse', 'Please login first!', true);
+                return;
+            }
+
+            const data = {
+                fromAccountNumber: document.getElementById('transferFromAccount').value,
+                toAccountNumber: document.getElementById('transferToAccount').value,
+                amount: parseFloat(document.getElementById('transferAmount').value),
+                description: document.getElementById('transferDescription').value || 'Transfer'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE.transactions}/transfer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                showResponse('transactionResponse', result, !response.ok);
+            } catch (error) {
+                showResponse('transactionResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function getTransactionHistory() {
+            if (!currentToken) {
+                showResponse('historyResponse', 'Please login first!', true);
+                return;
+            }
+
+            const accountNumber = document.getElementById('historyAccountNumber').value;
+
+            try {
+                const response = await fetch(`${API_BASE.transactions}/account/${accountNumber}`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const result = await response.json();
+                showResponse('historyResponse', result, !response.ok);
+            } catch (error) {
+                showResponse('historyResponse', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Get all customer details with their accounts
+        async function getAllCustomerDetails() {
+            console.log('📋 Getting all customer details...');
+
+            if (!currentToken) {
+                showResponse('allCustomersResponse', 'Please login first!', true);
+                return;
+            }
+
+            try {
+                // Fetch all customers
+                const customersResponse = await fetch(`${API_BASE.customers}`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (!customersResponse.ok) {
+                    throw new Error(`Failed to fetch customers: ${customersResponse.status}`);
+                }
+
+                const customers = await customersResponse.json();
+                console.log('✅ Customers fetched:', customers);
+
+                // Fetch all accounts
+                const accountsResponse = await fetch(`${API_BASE.accounts}`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const accounts = accountsResponse.ok ? await accountsResponse.json() : [];
+                console.log('✅ Accounts fetched:', accounts);
+
+                // Build comprehensive view
+                let html = '<div style="max-height: 500px; overflow-y: auto;">';
+                html += `<h3>Total Customers: ${customers.length}</h3>`;
+                html += `<h3>Total Accounts: ${accounts.length}</h3><hr>`;
+
+                customers.forEach(customer => {
+                    const customerAccounts = accounts.filter(acc =>
+                        acc.customerId === customer.id
+                    );
+
+                    html += `
+                        <div style="background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #007bff;">
+                            <h3 style="margin: 0 0 10px 0; color: #007bff;">
+                                👤 ${customer.fullName}
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                                <div><strong>CIF:</strong> ${customer.cifNumber}</div>
+                                <div><strong>User ID:</strong> ${customer.userId}</div>
+                                <div><strong>Username:</strong> ${customer.username || 'N/A'}</div>
+                                <div><strong>Phone:</strong> ${customer.phone}</div>
+                                <div><strong>PAN:</strong> ${customer.panNumber || 'N/A'}</div>
+                                <div><strong>Aadhaar:</strong> ${customer.aadhaarNumber || 'N/A'}</div>
+                                <div><strong>KYC Status:</strong> 
+                                    <span style="color: ${customer.kycStatus === 'VERIFIED' ? 'green' : 'orange'}; font-weight: bold;">
+                                        ${customer.kycStatus}
+                                    </span>
+                                </div>
+                                <div><strong>Customer Status:</strong> 
+                                    <span style="color: ${customer.customerStatus === 'ACTIVE' ? 'green' : 'red'}; font-weight: bold;">
+                                        ${customer.customerStatus}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <strong>📍 Address:</strong> ${customer.address}, ${customer.city}, ${customer.state} ${customer.postalCode}, ${customer.country}
+                            </div>
+                    `;
+
+                    if (customerAccounts.length > 0) {
+                        html += `<div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #dee2e6;">
+                            <h4 style="margin: 0 0 10px 0; color: #28a745;">💳 Accounts (${customerAccounts.length})</h4>`;
+
+                        customerAccounts.forEach(account => {
+                            html += `
+                                <div style="background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #dee2e6;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 13px;">
+                                        <div><strong>Account:</strong> ${account.accountNumber}</div>
+                                        <div><strong>Type:</strong> ${account.accountType}</div>
+                                        <div><strong>Balance:</strong> ₹${parseFloat(account.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div><strong>Status:</strong> 
+                                            <span style="color: ${account.accountStatus === 'ACTIVE' ? 'green' : 'red'};">
+                                                ${account.accountStatus}
+                                            </span>
+                                        </div>
+                                        <div><strong>Branch:</strong> ${account.branchCode || 'N/A'}</div>
+                                        <div><strong>IFSC:</strong> ${account.ifscCode || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    } else {
+                        html += `<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; color: #856404;">
+                            <strong>⚠️ No accounts found for this customer</strong>
+                        </div>`;
+                    }
+
+                    html += '</div>';
+                });
+
+                html += '</div>';
+                document.getElementById('allCustomersResponse').innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Error:', error);
+                showResponse('allCustomersResponse', `Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+
+</html>

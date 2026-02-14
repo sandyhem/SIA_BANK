@@ -14,7 +14,10 @@ import java.time.LocalDateTime;
 @Builder
 public class AccountDTO {
     private String accountNumber;
-    private Long customerId;
+    private String accountName;
+    private String accountType;
+    private String customerCif; // Customer Information File number
+    private Long userId;
     private BigDecimal balance;
     private String status;
     private LocalDateTime createdAt;

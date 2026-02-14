@@ -22,8 +22,17 @@ public class Account {
     @Column(name = "account_number", unique = true, nullable = false)
     private String accountNumber;
 
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @Column(name = "account_name")
+    private String accountName;
+
+    @Column(name = "account_type")
+    private String accountType;
+
+    @Column(name = "customer_cif", nullable = false)
+    private String customerCif; // Customer Information File number
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId; // For convenience, but CIF is the primary reference
 
     @Column(name = "balance", nullable = false)
     private BigDecimal balance;

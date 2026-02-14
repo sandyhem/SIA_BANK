@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
-    @ExceptionHandler({AccountInactiveException.class, InsufficientBalanceException.class})
+    @ExceptionHandler({ AccountInactiveException.class, InsufficientBalanceException.class })
     public ResponseEntity<Map<String, Object>> handleBusinessRule(RuntimeException ex) {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", OffsetDateTime.now());
@@ -31,6 +31,26 @@ public class GlobalExceptionHandler {
         body.put("error", "Bad Request");
         body.put("message", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(KycNotVerifiedException.class)
+    public ResponseEntity<Map<String, Object>> handleKycNotVerified(KycNotVerifiedException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("error", "KYC Verification Required");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(CustomerNotActiveException.class)
+    public ResponseEntity<Map<String, Object>> handleCustomerNotActive(CustomerNotActiveException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("error", "Customer Not Active");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
