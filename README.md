@@ -381,6 +381,31 @@ spring:
 ✅ **Validation** - Jakarta Bean Validation on all inputs  
 ✅ **Exception Handling** - Proper error responses  
 ✅ **Auto-generated IDs** - UUID-based account and transaction IDs
+✅ **PQC Security** - ML-KEM + ML-DSA integration for post-quantum readiness
+✅ **eBPF Runtime Monitoring** - Kernel-level service communication observability without app instrumentation
+
+## eBPF Runtime Monitoring (New)
+
+This repository now includes an eBPF-based runtime monitoring layer for encrypted fintech microservice traffic analysis.
+
+### What it provides
+
+- Kernel-level connect/close telemetry for service communication
+- Runtime anomaly detection for unauthorized service edges and lateral movement patterns
+- TLS candidate flow visibility without decrypting payloads
+- JSONL output for dashboard/SIEM ingestion
+
+### Quick Start
+
+```bash
+sudo apt-get update
+sudo apt-get install -y bpfcc-tools python3-bpfcc linux-headers-$(uname -r)
+
+chmod +x start-ebpf-monitor.sh ebpf/monitor_runtime.py
+sudo ./start-ebpf-monitor.sh
+```
+
+Generated telemetry log: `logs/ebpf-events.jsonl`
 
 ## Testing Workflow
 
@@ -438,10 +463,13 @@ mysql -u appuser -ppassword -e "SHOW DATABASES;"
 - [ ] Message Queue (RabbitMQ/Kafka)
 - [ ] Authentication & Authorization (JWT)
 - [ ] Docker & Kubernetes Deployment
+- [ ] Grafana/ELK dashboards for eBPF telemetry stream
 
 ## Documentation
 
 - **Design Document:** See [DESIGN_DOCUMENT.md](DESIGN_DOCUMENT.md) for comprehensive architecture details
+- **eBPF Integration Guide:** See [EBPF_INTEGRATION_GUIDE.md](EBPF_INTEGRATION_GUIDE.md)
+- **eBPF Runtime Module:** See [ebpf/README.md](ebpf/README.md)
 - **Test UI:** Open `test-ui.html` in browser for interactive API testing
 
 ## License

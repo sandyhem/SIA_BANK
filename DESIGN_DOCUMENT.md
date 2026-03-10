@@ -1124,4 +1124,61 @@ banking-microservices/
 
 ---
 
+## 21. eBPF Runtime Monitoring Extension (PQC Observability Layer)
+
+### Objective
+
+Add kernel-level runtime observability and anomaly detection for encrypted microservice communication without modifying service application code.
+
+### Architectural Positioning
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ React Frontend + Fintech Microservices (Auth/Account/Tx)│
+└───────────────────────────┬─────────────────────────────┘
+                            │ PQC/TLS traffic (ML-KEM + ML-DSA)
+┌───────────────────────────▼─────────────────────────────┐
+│ Linux Kernel Networking Stack                           │
+│ eBPF probes (kprobe/kretprobe on TCP lifecycle events)  │
+└───────────────────────────┬─────────────────────────────┘
+                            │ Runtime telemetry
+┌───────────────────────────▼─────────────────────────────┐
+│ Security Analysis Engine                                │
+│ - Unauthorized flow detection                           │
+│ - Lateral movement burst detection                      │
+│ - Process-port mismatch detection                       │
+└───────────────────────────┬─────────────────────────────┘
+                            │ JSON stream / JSONL
+┌───────────────────────────▼─────────────────────────────┐
+│ Monitoring Dashboard / SIEM                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Runtime Telemetry Captured
+
+- Source and destination addresses/ports
+- Process identity (PID/UID/command)
+- Connect latency (used as TLS/connection health proxy)
+- Service edge mapping based on known microservice ports
+
+### Security Detection Coverage
+
+- Unauthorized service communication paths
+- Suspicious lateral movement patterns (burst analysis)
+- High fan-out communication anomalies
+- Potential service impersonation signals (process-port mismatch)
+
+### Repository Implementation
+
+- `ebpf/monitor_runtime.py`: eBPF collector and analyzer
+- `ebpf/service_map.json`: service communication policy and thresholds
+- `start-ebpf-monitor.sh`: local launcher
+- `EBPF_INTEGRATION_GUIDE.md`: architecture/problem/novelty description
+
+### Novelty Statement
+
+"This work introduces an eBPF-based kernel-level monitoring framework for PQC-secured fintech microservice architectures, enabling real-time detection of anomalous service communication without modifying application code."
+
+---
+
 **End of Document**

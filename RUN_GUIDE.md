@@ -192,6 +192,103 @@ grep -i error logs/account-service.log
 grep -i error logs/transaction-service.log
 ```
 
+## Running eBPF Runtime Monitoring
+
+The project includes an optional eBPF monitoring layer for runtime security telemetry.
+
+### Prerequisites
+
+```bash
+sudo apt-get update
+sudo apt-get install -y bpfcc-tools python3-bpfcc linux-headers-$(uname -r)
+```
+
+### Start Monitor
+
+```bash
+cd /home/inba/SIA_BANK
+chmod +x start-ebpf-monitor.sh ebpf/monitor_runtime.py
+sudo ./start-ebpf-monitor.sh
+```
+
+### Output
+
+- Real-time JSON events in terminal
+- Persisted JSONL events at `logs/ebpf-events.jsonl`
+
+### Stop Monitor
+
+Press `Ctrl + C` in the monitor terminal.
+
+## Simulating an Attack for eBPF Detection
+
+This project includes a safe local attack simulator that generates suspicious traffic patterns for eBPF detection testing.
+
+### Demo files
+
+- `ebpf/service_map.attack-demo.json` (attack demo policy)
+- `ebpf/simulate_unwanted_behavior.py` (traffic generator)
+- `demo-ebpf-attack.sh` (end-to-end runner)
+
+### Run full demo (recommended)
+
+```bash
+cd /home/inba/SIA_BANK
+sudo ./demo-ebpf-attack.sh
+```
+
+### Verify alerts
+
+```bash
+grep -E 'PROCESS_PORT_MISMATCH|UNAUTHORIZED_FLOW|LATERAL_MOVEMENT_PATTERN' logs/ebpf-attack-demo.jsonl | head
+```
+
+Expected detections include:
+
+- `PROCESS_PORT_MISMATCH` (rogue process using mapped microservice port)
+- `UNAUTHORIZED_FLOW` (unexpected communication edge)
+- `LATERAL_MOVEMENT_PATTERN` (burst threshold reached in demo policy)
+
+### Why lateral movement now triggers reliably
+
+The detector now groups unauthorized destinations like `unknown:<ephemeral-port>` into a normalized burst key for tracking repeated suspicious behavior. This prevents false misses caused by changing client ephemeral ports.
+
+## Prometheus + Grafana for eBPF Visualization
+
+### 1) Run attack demo to generate telemetry
+
+```bash
+cd /home/inba/SIA_BANK
+sudo ./demo-ebpf-attack.sh
+```
+
+### 2) Start eBPF metrics exporter (host)
+
+```bash
+cd /home/inba/SIA_BANK
+chmod +x start-ebpf-exporter.sh ebpf/export_prometheus_metrics.py
+./start-ebpf-exporter.sh
+```
+
+Validate exporter:
+
+```bash
+curl -s http://localhost:9110/metrics | head
+```
+
+### 3) Start Prometheus and Grafana (Docker)
+
+```bash
+cd /home/inba/SIA_BANK/observability
+docker compose up -d
+```
+
+### 4) Open dashboards
+
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)
+- Dashboard: **eBPF Security Monitoring**
+
 ## Security Features
 
 - **mTLS (Mutual TLS)**: Both services require client certificates for authentication

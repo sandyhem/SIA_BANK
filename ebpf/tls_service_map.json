@@ -1,0 +1,164 @@
+{
+    "services": [
+        {
+            "name": "auth-service",
+            "port": 8083,
+            "expectedProcesses": [
+                "java"
+            ],
+            "tlsEnabled": true,
+            "tlsVersion": "TLS1.3",
+            "cipherSuites": [
+                "TLS_AES_256_GCM_SHA384",
+                "TLS_CHACHA20_POLY1305_SHA256"
+            ],
+            "certificatePath": "/home/inba/SIA_BANK/certs/auth-service.crt",
+            "pqcEnabled": true,
+            "kemAlgorithm": "ML-KEM-768",
+            "signatureAlgorithm": "ML-DSA-65"
+        },
+        {
+            "name": "account-service",
+            "port": 8081,
+            "expectedProcesses": [
+                "java"
+            ],
+            "tlsEnabled": true,
+            "tlsVersion": "TLS1.3",
+            "cipherSuites": [
+                "TLS_AES_256_GCM_SHA384",
+                "TLS_CHACHA20_POLY1305_SHA256"
+            ],
+            "certificatePath": "/home/inba/SIA_BANK/certs/account-service.crt",
+            "pqcEnabled": true,
+            "kemAlgorithm": "ML-KEM-768",
+            "signatureAlgorithm": "ML-DSA-65"
+        },
+        {
+            "name": "transaction-service",
+            "port": 8082,
+            "expectedProcesses": [
+                "java"
+            ],
+            "tlsEnabled": true,
+            "tlsVersion": "TLS1.3",
+            "cipherSuites": [
+                "TLS_AES_256_GCM_SHA384",
+                "TLS_CHACHA20_POLY1305_SHA256"
+            ],
+            "certificatePath": "/home/inba/SIA_BANK/certs/transaction-service.crt",
+            "pqcEnabled": true,
+            "kemAlgorithm": "ML-KEM-768",
+            "signatureAlgorithm": "ML-DSA-65"
+        },
+        {
+            "name": "frontend",
+            "port": 5174,
+            "expectedProcesses": [
+                "node",
+                "vite"
+            ],
+            "tlsEnabled": false,
+            "pqcEnabled": false
+        }
+    ],
+    "allowedFlows": [
+        {
+            "source": "frontend",
+            "destination": "auth-service",
+            "encrypted": true,
+            "description": "User authentication requests"
+        },
+        {
+            "source": "frontend",
+            "destination": "account-service",
+            "encrypted": true,
+            "description": "Account data retrieval"
+        },
+        {
+            "source": "frontend",
+            "destination": "transaction-service",
+            "encrypted": true,
+            "description": "Transaction operations"
+        },
+        {
+            "source": "transaction-service",
+            "destination": "account-service",
+            "encrypted": true,
+            "description": "Balance verification"
+        },
+        {
+            "source": "auth-service",
+            "destination": "account-service",
+            "encrypted": true,
+            "description": "User data validation"
+        },
+        {
+            "source": "auth-service",
+            "destination": "transaction-service",
+            "encrypted": true,
+            "description": "Token validation"
+        }
+    ],
+    "tlsCandidatePorts": [
+        443,
+        8443,
+        8081,
+        8082,
+        8083
+    ],
+    "tlsAnomalyThresholds": {
+        "maxBytesPerMinute": 10485760,
+        "maxHandshakesPerMinute": 100,
+        "minHandshakeDurationMs": 10,
+        "maxHandshakeDurationMs": 5000,
+        "suspiciousDataPatterns": [
+            "SELECT",
+            "DROP",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "password",
+            "admin"
+        ]
+    },
+    "encryptionMonitoring": {
+        "captureHandshakes": true,
+        "captureCipherSuites": true,
+        "captureCertificates": false,
+        "captureDataSamples": false,
+        "logLevel": "INFO",
+        "alertOnWeakCiphers": true,
+        "alertOnOldTlsVersions": true,
+        "weakCiphers": [
+            "TLS_RSA_WITH_AES_128_CBC_SHA",
+            "TLS_RSA_WITH_AES_256_CBC_SHA"
+        ],
+        "oldTlsVersions": [
+            "TLS1.0",
+            "TLS1.1",
+            "SSL3.0"
+        ]
+    },
+    "pqcMonitoring": {
+        "trackPqcHandshakes": true,
+        "validateKemAlgorithms": true,
+        "validateSignatureAlgorithms": true,
+        "expectedKemAlgorithms": [
+            "ML-KEM-768",
+            "ML-KEM-1024"
+        ],
+        "expectedSignatureAlgorithms": [
+            "ML-DSA-65",
+            "ML-DSA-87"
+        ],
+        "alertOnClassicCryptoFallback": true
+    },
+    "observability": {
+        "prometheusExport": true,
+        "grafanaDashboard": true,
+        "metricsPort": 9100,
+        "metricsPath": "/metrics",
+        "logFile": "logs/ebpf-ssl-traffic.jsonl"
+    }
+}

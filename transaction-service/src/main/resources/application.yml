@@ -27,11 +27,20 @@ jwt:
   use-post-quantum: false  # Set to true to validate ML-DSA-65 PQ signatures
 
 account-service:
-  url: http://127.0.0.1:8081
+  url: ${TRANSACTION_ACCOUNT_SERVICE_URL:http://127.0.0.1:8081}
+
+auth-service:
+  url: ${TRANSACTION_AUTH_SERVICE_URL:http://localhost:8083/auth}
 
 logging:
   level:
     com.banking.transaction: DEBUG
 
 server:
-  port: 8082
+  port: ${TRANSACTION_SERVER_PORT:8082}
+  forward-headers-strategy: framework
+  ssl:
+    enabled: ${TRANSACTION_SERVICE_TLS_ENABLED:false}
+    key-store: ${TRANSACTION_SERVICE_KEY_STORE:}
+    key-store-password: ${TRANSACTION_SERVICE_KEY_STORE_PASSWORD:changeit}
+    key-store-type: ${TRANSACTION_SERVICE_KEY_STORE_TYPE:PKCS12}

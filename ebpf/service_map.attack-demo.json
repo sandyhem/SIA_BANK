@@ -1,0 +1,79 @@
+{
+    "services": [
+        {
+            "name": "auth-service",
+            "port": 8083,
+            "expectedProcesses": [
+                "java"
+            ]
+        },
+        {
+            "name": "account-service",
+            "port": 8081,
+            "expectedProcesses": [
+                "java"
+            ]
+        },
+        {
+            "name": "transaction-service",
+            "port": 8082,
+            "expectedProcesses": [
+                "java"
+            ]
+        },
+        {
+            "name": "frontend",
+            "port": 5174,
+            "expectedProcesses": [
+                "node",
+                "vite"
+            ]
+        },
+        {
+            "name": "risk-analysis-service",
+            "port": 19090,
+            "expectedProcesses": [
+                "java"
+            ]
+        }
+    ],
+    "allowedFlows": [
+        {
+            "source": "frontend",
+            "destination": "auth-service"
+        },
+        {
+            "source": "frontend",
+            "destination": "account-service"
+        },
+        {
+            "source": "frontend",
+            "destination": "transaction-service"
+        },
+        {
+            "source": "transaction-service",
+            "destination": "account-service"
+        },
+        {
+            "source": "auth-service",
+            "destination": "account-service"
+        },
+        {
+            "source": "auth-service",
+            "destination": "transaction-service"
+        }
+    ],
+    "tlsCandidatePorts": [
+        443,
+        8443,
+        8081,
+        8082,
+        8083,
+        19090
+    ],
+    "anomalyThresholds": {
+        "maxDistinctPeersPerMinute": 20,
+        "slowConnectMs": 150,
+        "unknownFlowBurstPerMinute": 3
+    }
+}

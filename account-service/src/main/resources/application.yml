@@ -13,16 +13,17 @@ spring:
         format_sql: true
 
 server:
-  port: 8081
-  # ssl:
-  #   enabled: true
-  #   key-store: classpath:ssl/account-service.p12
-  #   key-store-password: changeit
-  #   key-store-type: PKCS12
-  #   trust-store: classpath:ssl/account-truststore.p12
-  #   trust-store-password: changeit
-  #   trust-store-type: PKCS12
-  #   client-auth: need
+  port: ${ACCOUNT_SERVER_PORT:8081}
+  forward-headers-strategy: framework
+  ssl:
+    enabled: ${ACCOUNT_SERVICE_TLS_ENABLED:false}
+    key-store: ${ACCOUNT_SERVICE_KEY_STORE:}
+    key-store-password: ${ACCOUNT_SERVICE_KEY_STORE_PASSWORD:changeit}
+    key-store-type: ${ACCOUNT_SERVICE_KEY_STORE_TYPE:PKCS12}
+
+auth:
+  service:
+    url: ${ACCOUNT_AUTH_SERVICE_URL:http://localhost:8083}
 
 logging:
   level:

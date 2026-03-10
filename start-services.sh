@@ -7,11 +7,39 @@ echo "=== SIA Banking Services Startup ==="
 echo "Starting services with KYC verification enabled..."
 echo ""
 
+TLS_MODE="${TLS_MODE:-nginx-proxy}"
+TLS_ENV_FILE="${TLS_ENV_FILE:-/home/inba/SIA_BANK/tls-config/${TLS_MODE}.env}"
+
+if [ -f "$TLS_ENV_FILE" ]; then
+    echo "Loading transport mode from $TLS_ENV_FILE"
+    set -a
+    # shellcheck disable=SC1090
+    source "$TLS_ENV_FILE"
+    set +a
+else
+    echo "Transport config not found: $TLS_ENV_FILE"
+    exit 1
+fi
+
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+auth_scheme="http"
+account_scheme="http"
+transaction_scheme="http"
+
+if [ "${AUTH_SERVICE_TLS_ENABLED:-false}" = "true" ]; then
+    auth_scheme="https"
+fi
+if [ "${ACCOUNT_SERVICE_TLS_ENABLED:-false}" = "true" ]; then
+    account_scheme="https"
+fi
+if [ "${TRANSACTION_SERVICE_TLS_ENABLED:-false}" = "true" ]; then
+    transaction_scheme="https"
+fi
 
 # Function to check if port is in use
 check_port() {
@@ -31,7 +59,7 @@ wait_for_service() {
     
     echo -n "Waiting for $name to start..."
     while [ $attempt -le $max_attempts ]; do
-        if curl -s "$url" > /dev/null 2>&1; then
+        if curl -k -s "$url" > /dev/null 2>&1; then
             echo -e " ${GREEN}✓${NC}"
             return 0
         fi
@@ -58,7 +86,7 @@ AUTH_PID=$!
 echo "Auth Service PID: $AUTH_PID"
 
 # Wait for Auth Service
-if wait_for_service "http://localhost:8083/auth/api/auth/health" "Auth Service"; then
+if wait_for_service "${auth_scheme}://localhost:${AUTH_SERVER_PORT:-8083}/auth/api/auth/health" "Auth Service"; then
     echo -e "${GREEN}Auth Service started successfully on port 8083${NC}"
 else
     echo -e "${RED}Auth Service failed to start. Check auth-service.log${NC}"
@@ -73,7 +101,7 @@ ACCOUNT_PID=$!
 echo "Account Service PID: $ACCOUNT_PID"
 
 # Wait for Account Service
-if wait_for_service "http://localhost:8081/accounts/api/accounts/health" "Account Service"; then
+if wait_for_service "${account_scheme}://localhost:${ACCOUNT_SERVER_PORT:-8081}/accounts/api/accounts/health" "Account Service"; then
     echo -e "${GREEN}Account Service started successfully on port 8081${NC}"
 else
     echo -e "${RED}Account Service failed to start. Check account-service.log${NC}"
@@ -95,9 +123,10 @@ echo ""
 echo -e "${GREEN}=== All Services Started Successfully ===${NC}"
 echo ""
 echo "Service Status:"
-echo "  ✓ Auth Service:        http://localhost:8083 (PID: $AUTH_PID)"
-echo "  ✓ Account Service:     http://localhost:8081 (PID: $ACCOUNT_PID)"
-echo "  ✓ Transaction Service: http://localhost:8082 (PID: $TRANSACTION_PID)"
+echo "  ✓ Auth Service:        ${auth_scheme}://localhost:${AUTH_SERVER_PORT:-8083} (PID: $AUTH_PID)"
+echo "  ✓ Account Service:     ${account_scheme}://localhost:${ACCOUNT_SERVER_PORT:-8081} (PID: $ACCOUNT_PID)"
+echo "  ✓ Transaction Service: ${transaction_scheme}://localhost:${TRANSACTION_SERVER_PORT:-8082} (PID: $TRANSACTION_PID)"
+echo "Transport Mode: ${TLS_MODE}"
 echo ""
 echo "Frontend: http://localhost:5174"
 echo ""

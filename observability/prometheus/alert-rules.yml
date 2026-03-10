@@ -1,0 +1,80 @@
+groups:
+  - name: ebpf_security_alerts
+    interval: 10s
+    rules:
+      # Critical: Lateral Movement Detection
+      - alert: LateralMovementDetected
+        expr: rate(ebpf_alerts_total{type="LATERAL_MOVEMENT_PATTERN"}[1m]) > 0
+        for: 15s
+        labels:
+          severity: critical
+          category: lateral_movement
+        annotations:
+          summary: "Lateral movement pattern detected"
+          description: "Detected {{ $value | humanize }} lateral movement alerts per second. This indicates potential network reconnaissance or pivoting behavior."
+          
+      # High: Process-Port Mismatch
+      - alert: ProcessPortMismatchHigh
+        expr: rate(ebpf_alerts_total{type="PROCESS_PORT_MISMATCH"}[2m]) > 0.5
+        for: 30s
+        labels:
+          severity: high
+          category: process_anomaly
+        annotations:
+          summary: "High rate of process-port mismatches"
+          description: "Detected {{ $value | humanize }} process-port mismatches per second. Unexpected processes are binding to registered service ports."
+          
+      # High: Unauthorized Flow Burst
+      - alert: UnauthorizedFlowBurst
+        expr: rate(ebpf_alerts_total{type="UNAUTHORIZED_FLOW"}[2m]) > 1
+        for: 30s
+        labels:
+          severity: high
+          category: unauthorized_access
+        annotations:
+          summary: "Burst of unauthorized network flows"
+          description: "Detected {{ $value | humanize }} unauthorized flows per second. Connections to unregistered services are spiking."
+          
+      # Medium: High Fan-out Connections
+      - alert: HighFanoutActivity
+        expr: rate(ebpf_alerts_total{type="HIGH_FANOUT"}[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: medium
+          category: network_scan
+        annotations:
+          summary: "High fan-out connection pattern"
+          description: "Process is connecting to an unusually high number of distinct destinations ({{ $value | humanize }}/s). May indicate scanning activity."
+          
+      # Medium: Slow Connection Attempts
+      - alert: SlowConnectionPattern
+        expr: rate(ebpf_alerts_total{type="SLOW_CONNECT"}[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: medium
+          category: network_anomaly
+        annotations:
+          summary: "Persistent slow connection attempts"
+          description: "Detected {{ $value | humanize }} slow connections per second. May indicate port scanning or network issues."
+          
+      # Info: eBPF Exporter Down
+      - alert: EBPFExporterDown
+        expr: up{job="ebpf-monitor"} == 0
+        for: 30s
+        labels:
+          severity: warning
+          category: monitoring
+        annotations:
+          summary: "eBPF metrics exporter is down"
+          description: "The eBPF Prometheus exporter has been down for more than 30 seconds. Security monitoring may be impaired."
+          
+      # Info: No Security Events
+      - alert: NoSecurityEventsReported
+        expr: rate(ebpf_events_total[10m]) == 0
+        for: 5m
+        labels:
+          severity: info
+          category: monitoring
+        annotations:
+          summary: "No eBPF events in the last 10 minutes"
+          description: "The eBPF monitor has not reported any network events. Check if the monitor is running correctly."

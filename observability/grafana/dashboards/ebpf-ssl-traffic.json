@@ -1,0 +1,271 @@
+{
+    "title": "eBPF SSL/TLS Traffic Monitor",
+    "tags": [
+        "ebpf",
+        "ssl",
+        "tls",
+        "security",
+        "pqc"
+    ],
+    "timezone": "browser",
+    "refresh": "5s",
+    "time": {
+        "from": "now-15m",
+        "to": "now"
+    },
+    "panels": [
+        {
+            "id": 1,
+            "title": "SSL/TLS Traffic Volume",
+            "type": "graph",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "rate(ssl_traffic_bytes_sent_total[1m])",
+                    "legendFormat": "{{service}} - Sent"
+                },
+                {
+                    "expr": "rate(ssl_traffic_bytes_received_total[1m])",
+                    "legendFormat": "{{service}} - Received"
+                }
+            ],
+            "yaxes": [
+                {
+                    "format": "Bps",
+                    "label": "Bytes/sec"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "title": "TLS Handshakes Rate",
+            "type": "graph",
+            "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "rate(ssl_handshakes_total[1m])",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "yaxes": [
+                {
+                    "format": "ops",
+                    "label": "Handshakes/sec"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "title": "Active SSL Connections",
+            "type": "graph",
+            "gridPos": {
+                "x": 0,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "ssl_connections_active",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "yaxes": [
+                {
+                    "format": "short",
+                    "label": "Connections"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "title": "TLS Handshake Duration (p99)",
+            "type": "graph",
+            "gridPos": {
+                "x": 12,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "ssl_handshake_duration_seconds{quantile=\"0.99\"}",
+                    "legendFormat": "{{service}} - p99"
+                },
+                {
+                    "expr": "ssl_handshake_duration_seconds{quantile=\"0.9\"}",
+                    "legendFormat": "{{service}} - p90"
+                },
+                {
+                    "expr": "ssl_handshake_duration_seconds{quantile=\"0.5\"}",
+                    "legendFormat": "{{service}} - p50"
+                }
+            ],
+            "yaxes": [
+                {
+                    "format": "s",
+                    "label": "Duration"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "title": "TLS Version Distribution",
+            "type": "piechart",
+            "gridPos": {
+                "x": 0,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (version) (ssl_tls_version_info)",
+                    "legendFormat": "{{version}}"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "title": "Cipher Suite Distribution",
+            "type": "piechart",
+            "gridPos": {
+                "x": 12,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (cipher) (ssl_cipher_suite_info)",
+                    "legendFormat": "{{cipher}}"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "title": "SSL/TLS Anomalies",
+            "type": "graph",
+            "gridPos": {
+                "x": 0,
+                "y": 24,
+                "w": 24,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "rate(ssl_anomalies_total[1m])",
+                    "legendFormat": "{{service}} - {{type}}"
+                }
+            ],
+            "yaxes": [
+                {
+                    "format": "ops",
+                    "label": "Anomalies/sec"
+                }
+            ],
+            "alert": {
+                "conditions": [
+                    {
+                        "evaluator": {
+                            "params": [
+                                1
+                            ],
+                            "type": "gt"
+                        },
+                        "operator": {
+                            "type": "and"
+                        },
+                        "query": {
+                            "params": [
+                                "A",
+                                "5m",
+                                "now"
+                            ]
+                        },
+                        "reducer": {
+                            "params": [],
+                            "type": "avg"
+                        },
+                        "type": "query"
+                    }
+                ],
+                "executionErrorState": "alerting",
+                "frequency": "1m",
+                "handler": 1,
+                "message": "SSL/TLS anomaly detected",
+                "name": "SSL Anomaly Alert",
+                "noDataState": "no_data",
+                "notifications": []
+            }
+        },
+        {
+            "id": 8,
+            "title": "Per-Service Traffic Summary",
+            "type": "table",
+            "gridPos": {
+                "x": 0,
+                "y": 32,
+                "w": 24,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (service) (ssl_traffic_bytes_sent_total)",
+                    "format": "table",
+                    "instant": true
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {},
+                        "indexByName": {},
+                        "renameByName": {
+                            "service": "Service",
+                            "Value": "Bytes Sent"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "templating": {
+        "list": [
+            {
+                "name": "service",
+                "type": "query",
+                "query": "label_values(ssl_traffic_bytes_sent_total, service)",
+                "refresh": 1,
+                "includeAll": true,
+                "multi": true
+            }
+        ]
+    },
+    "annotations": {
+        "list": [
+            {
+                "datasource": "Prometheus",
+                "enable": true,
+                "expr": "ALERTS{alertname=\"SSL Anomaly Alert\"}",
+                "iconColor": "red",
+                "name": "SSL Alerts",
+                "step": "60s",
+                "tagKeys": "service,type",
+                "textFormat": "{{type}} on {{service}}",
+                "titleFormat": "SSL Alert"
+            }
+        ]
+    }
+}
