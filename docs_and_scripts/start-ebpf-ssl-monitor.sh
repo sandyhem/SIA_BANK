@@ -15,6 +15,9 @@ LOG_DIR="$PROJECT_ROOT/logs"
 CONFIG_FILE="$EBPF_DIR/tls_service_map.json"
 OUTPUT_LOG="$LOG_DIR/ebpf-ssl-traffic.jsonl"
 SUMMARY_INTERVAL=30
+JAVA_RUNTIME=false
+RUNTIME_CONFIG_FILE="$EBPF_DIR/service_map.json"
+RUNTIME_OUTPUT_LOG="$LOG_DIR/ebpf-runtime-events.jsonl"
 SIMULATE=false
 SIMULATE_ITERATIONS=5
 INCLUDE_UNKNOWN=""
@@ -140,6 +143,10 @@ while [[ $# -gt 0 ]]; do
             INCLUDE_UNKNOWN="--include-unknown"
             shift
             ;;
+        --java-runtime)
+            JAVA_RUNTIME=true
+            shift
+            ;;
         --simulate)
             SIMULATE=true
             shift
@@ -158,11 +165,29 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--capture-data] [--include-unknown] [--simulate] [--simulate-iterations N] [--ssl-lib PATH] [--summary-interval SECONDS]"
+            echo "Usage: $0 [--java-runtime] [--capture-data] [--include-unknown] [--simulate] [--simulate-iterations N] [--ssl-lib PATH] [--summary-interval SECONDS]"
             exit 1
             ;;
     esac
 done
+
+if [ "$JAVA_RUNTIME" = true ]; then
+    if [ ! -f "$RUNTIME_CONFIG_FILE" ]; then
+        echo -e "${RED}ERROR: Runtime config file not found: $RUNTIME_CONFIG_FILE${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Starting Java-compatible eBPF runtime monitor...${NC}"
+    echo -e "${YELLOW}Mode: TCP runtime flow monitor (recommended for Java microservices)${NC}"
+    echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
+    echo ""
+
+    python3 "$EBPF_DIR/monitor_runtime.py" \
+      --config "$RUNTIME_CONFIG_FILE" \
+      --output "$RUNTIME_OUTPUT_LOG" \
+      --summary-interval "$SUMMARY_INTERVAL"
+    exit 0
+fi
 
 # Build command
 CMD="python3 $EBPF_DIR/monitor_ssl_traffic.py \

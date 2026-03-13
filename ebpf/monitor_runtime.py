@@ -62,7 +62,7 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state) {
     bpf_probe_read_kernel(&event.saddr, sizeof(event.saddr), args->saddr);
     bpf_probe_read_kernel(&event.daddr, sizeof(event.daddr), args->daddr);
     event.sport = args->sport;
-    event.dport = ntohs(args->dport);
+    event.dport = args->dport;
     event.netns = 0;
     event.delta_ms = 0;
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
