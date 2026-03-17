@@ -5,6 +5,8 @@ import com.banking.auth.dto.LoginRequestDTO;
 import com.banking.auth.dto.RegisterRequestDTO;
 import com.banking.auth.dto.UserKycDTO;
 
+import java.util.Map;
+
 public interface AuthService {
     AuthResponseDTO register(RegisterRequestDTO registerRequest);
 
@@ -13,4 +15,6 @@ public interface AuthService {
     Boolean validateToken(String token);
 
     UserKycDTO getUserKycStatus(Long userId);
+
+    Map<String, Object> getCurrentUserSummary(String username);
 }

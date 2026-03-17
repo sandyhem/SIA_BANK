@@ -14,14 +14,14 @@
 
 ### 2️⃣ Create Customer Profile (CIF)
 
-After login, you'll see a **purple welcome screen** on the Dashboard:
+After login, users without customer/account setup will see a **Finish Account Setup** card on Home.
 
 **What you'll see:**
-- "Create Your Customer Profile" heading
-- Information about what you need
-- "Create Customer Profile" button
+- "Finish Account Setup" heading
+- "Create Profile & Account" button
+- A note that admin KYC verification is required before activation
 
-**Click the button and fill in the form:**
+**Click `Create Profile & Account` and fill in the onboarding form:**
 
 #### Personal Information:
 - **Full Name**: Your complete legal name (e.g., "John Michael Doe")
@@ -57,7 +57,15 @@ After creating your profile, you'll see a **yellow/amber screen**:
 
 **To verify KYC (Admin Action):**
 
-#### Option A: Using Swagger UI (Recommended)
+#### Option A: In-App Admin Page (Primary)
+1. Login with an `ADMIN` user.
+2. Open Home dashboard.
+3. Click `Review KYC Requests`.
+4. Select pending customer and click `Verify` or `Reject`.
+
+This updates the customer KYC status immediately.
+
+#### Option B: Using Swagger UI
 ```bash
 # Open Swagger UI in your browser
 http://localhost:8083/auth/swagger-ui/index.html
@@ -73,13 +81,13 @@ http://localhost:8083/auth/swagger-ui/index.html
 # Click "Execute"
 ```
 
-#### Option B: Using Database
+#### Option C: Using Database
 ```bash
 # In terminal, run:
 sudo mysql auth_db -e "UPDATE customers SET kyc_status = 'VERIFIED' WHERE cif_number = 'YOUR_CIF_NUMBER';"
 ```
 
-#### Option C: Using curl
+#### Option D: Using curl
 ```bash
 curl -X PUT "http://localhost:8083/auth/api/customers/cif/YOUR_CIF_NUMBER/kyc" \
   -H "Content-Type: application/json" \
@@ -229,7 +237,7 @@ Once fully set up, your Dashboard shows:
 ## 🚀 Quick Start Checklist
 
 - [x] **Register** - Create user account
-- [ ] **Create CIF** - Fill customer profile form
+- [ ] **Create Profile & Account** - Submit customer details and account request
 - [ ] **Verify KYC** - Admin verifies your documents
 - [ ] **Open Account** - Create savings/current account
 - [ ] **Transfer Money** - Send money between accounts

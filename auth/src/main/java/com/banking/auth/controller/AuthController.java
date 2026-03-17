@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -48,5 +49,14 @@ public class AuthController {
     public ResponseEntity<UserKycDTO> getUserKycStatus(@PathVariable Long userId) {
         UserKycDTO userKyc = authService.getUserKycStatus(userId);
         return ResponseEntity.ok(userKyc);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<Map<String, Object>> getCurrentUser(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Unauthenticated"));
+        }
+        return ResponseEntity.ok(authService.getCurrentUserSummary(authentication.getName()));
     }
 }

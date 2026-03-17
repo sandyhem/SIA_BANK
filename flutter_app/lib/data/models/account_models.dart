@@ -56,8 +56,8 @@ class AccountDTO {
       type: (typeValue ?? 'SAVINGS').toString(),
       createdAt: json['createdAt']?.toString(),
       currency: json['currency']?.toString(),
-      lastTransactionDate: (json['lastTransactionDate'] ?? json['updatedAt'])
-          ?.toString(),
+      lastTransactionDate:
+          (json['lastTransactionDate'] ?? json['updatedAt'])?.toString(),
     );
   }
 
@@ -66,8 +66,8 @@ class AccountDTO {
 
 @JsonSerializable()
 class CreateAccountRequest {
-  @JsonKey(name: 'customerId')
-  final int customerId;
+  @JsonKey(name: 'userId')
+  final int userId;
 
   @JsonKey(name: 'accountType')
   final String accountType;
@@ -75,16 +75,35 @@ class CreateAccountRequest {
   @JsonKey(name: 'initialBalance')
   final double initialBalance;
 
+  @JsonKey(name: 'accountName')
+  final String? accountName;
+
   CreateAccountRequest({
-    required this.customerId,
+    required this.userId,
     required this.accountType,
     required this.initialBalance,
+    this.accountName,
   });
 
-  factory CreateAccountRequest.fromJson(Map<String, dynamic> json) =>
-      _$CreateAccountRequestFromJson(json);
+  factory CreateAccountRequest.fromJson(Map<String, dynamic> json) {
+    final dynamic userIdValue = json['userId'] ?? json['customerId'];
+    return CreateAccountRequest(
+      userId: userIdValue is num
+          ? userIdValue.toInt()
+          : int.tryParse(userIdValue?.toString() ?? '') ?? 0,
+      accountType: (json['accountType'] ?? 'SAVINGS').toString(),
+      initialBalance: (json['initialBalance'] as num).toDouble(),
+      accountName: json['accountName']?.toString(),
+    );
+  }
 
-  Map<String, dynamic> toJson() => _$CreateAccountRequestToJson(this);
+  Map<String, dynamic> toJson() => {
+        'userId': userId,
+        'accountType': accountType,
+        'initialBalance': initialBalance,
+        if (accountName != null && accountName!.trim().isNotEmpty)
+          'accountName': accountName,
+      };
 }
 
 @JsonSerializable()

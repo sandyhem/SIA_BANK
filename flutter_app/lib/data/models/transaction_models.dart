@@ -14,53 +14,109 @@ class TransactionDTO {
   final double amount;
 
   @JsonKey(name: 'date')
-  final String date;
+  final String? date;
 
   @JsonKey(name: 'status')
-  final String status; // PENDING, COMPLETED, FAILED
+  final String status; // PENDING, COMPLETED, FAILED, SUCCESS
 
   @JsonKey(name: 'narration')
   final String? narration;
 
+  @JsonKey(name: 'fromAccountNumber')
+  final String? fromAccountNumber;
+
   @JsonKey(name: 'fromAccount')
   final String? fromAccount;
+
+  @JsonKey(name: 'toAccountNumber')
+  final String? toAccountNumber;
 
   @JsonKey(name: 'toAccount')
   final String? toAccount;
 
+  @JsonKey(name: 'description')
+  final String? description;
+
   @JsonKey(name: 'reference')
   final String? reference;
+
+  @JsonKey(name: 'createdAt')
+  final String? createdAt;
 
   TransactionDTO({
     required this.transactionId,
     required this.type,
     required this.amount,
-    required this.date,
+    this.date,
     required this.status,
     this.narration,
+    this.fromAccountNumber,
     this.fromAccount,
+    this.toAccountNumber,
     this.toAccount,
+    this.description,
     this.reference,
+    this.createdAt,
   });
 
-  factory TransactionDTO.fromJson(Map<String, dynamic> json) =>
-      _$TransactionDTOFromJson(json);
+  String get getFromAccount => fromAccountNumber ?? fromAccount ?? '';
+  String get getToAccount => toAccountNumber ?? toAccount ?? '';
+  String get getDescription => description ?? narration ?? 'Transfer';
+  String get getDate => createdAt ?? date ?? '';
 
-  Map<String, dynamic> toJson() => _$TransactionDTOToJson(this);
+  factory TransactionDTO.fromJson(Map<String, dynamic> json) => TransactionDTO(
+        transactionId: (json['transactionId'] ?? json['id'] ?? '').toString(),
+        type:
+            (json['type'] ?? json['transactionType'] ?? 'TRANSFER').toString(),
+        amount: (json['amount'] is num)
+            ? (json['amount'] as num).toDouble()
+            : double.tryParse('${json['amount'] ?? 0}') ?? 0,
+        date: (json['date'] ?? json['transactionDate'])?.toString(),
+        status: (json['status'] ?? 'PENDING').toString(),
+        narration: json['narration']?.toString(),
+        fromAccountNumber:
+            (json['fromAccountNumber'] ?? json['senderAccount'])?.toString(),
+        fromAccount: json['fromAccount']?.toString(),
+        toAccountNumber:
+            (json['toAccountNumber'] ?? json['receiverAccount'])?.toString(),
+        toAccount: json['toAccount']?.toString(),
+        description: json['description']?.toString(),
+        reference: (json['reference'] ?? json['referenceNumber'])?.toString(),
+        createdAt: (json['createdAt'] ?? json['timestamp'])?.toString(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'transactionId': transactionId,
+        'type': type,
+        'amount': amount,
+        'date': date,
+        'status': status,
+        'narration': narration,
+        'fromAccountNumber': fromAccountNumber,
+        'fromAccount': fromAccount,
+        'toAccountNumber': toAccountNumber,
+        'toAccount': toAccount,
+        'description': description,
+        'reference': reference,
+        'createdAt': createdAt,
+      };
 }
 
 @JsonSerializable()
 class TransferRequestDTO {
-  @JsonKey(name: 'fromAccount')
+  // Backend contract expects fromAccountNumber.
+  @JsonKey(name: 'fromAccountNumber')
   final String fromAccount;
 
-  @JsonKey(name: 'toAccount')
+  // Backend contract expects toAccountNumber.
+  @JsonKey(name: 'toAccountNumber')
   final String toAccount;
 
   @JsonKey(name: 'amount')
   final double amount;
 
-  @JsonKey(name: 'narration')
+  // Backend contract expects description.
+  @JsonKey(name: 'description')
   final String? narration;
 
   TransferRequestDTO({

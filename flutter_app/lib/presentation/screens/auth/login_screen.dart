@@ -4,7 +4,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../data/models/auth_models.dart';
-import '../../../data/services/api_service.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -56,6 +55,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       final response = await apiService.login(request);
 
+      // Admin users do not manage accounts or balances, so MPIN gating is
+      // not applicable. Skip the MPIN prompt entirely for admins.
+      final isAdmin = (response.role ?? '').toUpperCase().contains('ADMIN');
+
+      if (!isAdmin) {
+        final hasMpin = await apiService.hasMpinForCurrentUser();
+        if (!hasMpin) {
+          final mpin = await _promptSetupMpin();
+          if (mpin == null) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = 'MPIN setup is required to continue.';
+            });
+            return;
+          }
+          await apiService.setMpinForUser(userId: response.userId, mpin: mpin);
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Welcome back, User ${response.userId}!')),
@@ -65,7 +83,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       setState(() => _errorMessage = _formatErrorMessage(e));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -75,6 +95,108 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return message.substring('Exception: '.length);
     }
     return message;
+  }
+
+  Future<String?> _promptSetupMpin() async {
+    final mpinController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscure1 = true;
+    bool obscure2 = true;
+    String? inlineError;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('Set Your MPIN'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: mpinController,
+                    keyboardType: TextInputType.number,
+                    obscureText: obscure1,
+                    maxLength: 4,
+                    decoration: InputDecoration(
+                      labelText: '4-digit MPIN',
+                      counterText: '',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscure1
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () {
+                          setLocalState(() => obscure1 = !obscure1);
+                        },
+                      ),
+                    ),
+                  ),
+                  TextField(
+                    controller: confirmController,
+                    keyboardType: TextInputType.number,
+                    obscureText: obscure2,
+                    maxLength: 4,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm MPIN',
+                      counterText: '',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscure2
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () {
+                          setLocalState(() => obscure2 = !obscure2);
+                        },
+                      ),
+                    ),
+                  ),
+                  if (inlineError != null)
+                    Padding(
+                      padding: EdgeInsets.only(top: 8.h),
+                      child: Text(
+                        inlineError!,
+                        style: TextStyle(
+                          color: AppTheme.dangerColor,
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('Later'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final mpin = mpinController.text.trim();
+                    final confirm = confirmController.text.trim();
+                    if (!RegExp(r'^\d{4}$').hasMatch(mpin)) {
+                      setLocalState(
+                        () => inlineError = 'MPIN must be exactly 4 digits',
+                      );
+                      return;
+                    }
+                    if (mpin != confirm) {
+                      setLocalState(() => inlineError = 'MPIN does not match');
+                      return;
+                    }
+                    Navigator.of(context).pop(mpin);
+                  },
+                  child: const Text('Save MPIN'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildErrorBanner(String message) {
@@ -116,6 +238,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
+              Center(
+                child: Container(
+                  width: 72.w,
+                  height: 72.w,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(20.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.account_balance,
+                    color: Colors.white,
+                    size: 36.sp,
+                  ),
+                ),
+              ),
+              SizedBox(height: 24.h),
               Text(
                 'Welcome Back',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -124,8 +269,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               SizedBox(height: 8.h),
               Text(
-                'Login to access your accounts',
-                style: Theme.of(context).textTheme.bodyMedium,
+                'Sign in to your SIA Bank account',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textLight,
+                    ),
               ),
               SizedBox(height: 32.h),
 
@@ -133,8 +280,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               TextField(
                 controller: _usernameController,
                 decoration: InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'Enter your username',
+                  labelText: 'Username or Email',
+                  hintText: 'Enter username or email',
                   prefixIcon: const Icon(Icons.person_outline),
                   enabled: !_isLoading,
                 ),
@@ -173,23 +320,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               SizedBox(height: 24.h),
 
-              // Forgot Password
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isLoading ? null : () {},
-                  child: Text(
-                    'Forgot Password?',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: 16.h),
-
               // Login Button
               SizedBox(
                 width: double.infinity,
@@ -213,36 +343,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ),
                 ),
-              ),
-              SizedBox(height: 24.h),
-
-              // Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: AppTheme.borderColor)),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w),
-                    child: Text(
-                      'or',
-                      style: TextStyle(
-                        color: AppTheme.textLight,
-                        fontSize: 12.sp,
-                      ),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: AppTheme.borderColor)),
-                ],
-              ),
-              SizedBox(height: 24.h),
-
-              // Social Login (placeholder)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSocialButton('Google', Icons.language),
-                  _buildSocialButton('Apple', Icons.apple),
-                  _buildSocialButton('Biometric', Icons.fingerprint),
-                ],
               ),
               SizedBox(height: 32.h),
 
@@ -277,42 +377,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSocialButton(String label, IconData icon) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 80, minHeight: 72),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.borderColor),
-        borderRadius: BorderRadius.circular(12.r),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12.r),
-          onTap: _isLoading ? null : () {},
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 20.sp, color: AppTheme.textDark),
-              SizedBox(height: 6.h),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  color: AppTheme.textLight,
-                ),
               ),
             ],
           ),

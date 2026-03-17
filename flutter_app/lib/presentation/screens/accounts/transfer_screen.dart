@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../data/models/transaction_models.dart';
-import '../../../data/services/api_service.dart';
 
 class TransferScreen extends ConsumerStatefulWidget {
-  const TransferScreen({Key? key}) : super(key: key);
+  final String? sourceAccountNumber;
+
+  const TransferScreen({Key? key, this.sourceAccountNumber}) : super(key: key);
 
   @override
   ConsumerState<TransferScreen> createState() => _TransferScreenState();
@@ -22,14 +24,19 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
+  List<String> _savedBeneficiaries = const <String>[];
+  static const double _dailyTransferLimit = 1000000.0;
 
   @override
   void initState() {
     super.initState();
-    _fromAccountController = TextEditingController();
+    _fromAccountController = TextEditingController(
+      text: widget.sourceAccountNumber ?? '',
+    );
     _toAccountController = TextEditingController();
     _amountController = TextEditingController();
     _narrationController = TextEditingController();
+    _loadSavedBeneficiaries();
   }
 
   @override
@@ -54,14 +61,53 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
     try {
       final apiService = ref.read(apiServiceProvider);
+      final hasMpin = await apiService.hasMpinForCurrentUser();
+      if (!hasMpin) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              'MPIN is not set for this account. Please register/login again to configure MPIN.';
+        });
+        return;
+      }
+
+      final isMpinVerified = await _promptAndVerifyMpin();
+      if (!isMpinVerified) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Invalid MPIN. Transfer cancelled.';
+        });
+        return;
+      }
+
+      final amount = double.parse(_amountController.text);
+      final withinLimit = await _validateDailyLimit(amount);
+      if (!withinLimit) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
       final request = TransferRequestDTO(
         fromAccount: _fromAccountController.text,
         toAccount: _toAccountController.text,
-        amount: double.parse(_amountController.text),
-        narration: _narrationController.text.isEmpty ? null : _narrationController.text,
+        amount: amount,
+        narration: _narrationController.text.isEmpty
+            ? 'Transfer from ${_fromAccountController.text} to ${_toAccountController.text}'
+            : _narrationController.text,
       );
 
       final response = await apiService.transferFunds(request);
+
+      // YONO-style quick transfer support: remember successful recipients.
+      if (_toAccountController.text.trim() !=
+          _fromAccountController.text.trim()) {
+        await apiService.saveBeneficiaryForCurrentUser(
+          _toAccountController.text.trim(),
+        );
+        await _loadSavedBeneficiaries();
+      }
 
       setState(() => _successMessage = response);
 
@@ -70,7 +116,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
           const SnackBar(content: Text('Transfer completed successfully!')),
         );
         Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) Navigator.of(context).pop();
+          if (mounted) Navigator.of(context).pop(true);
         });
       }
     } catch (e) {
@@ -78,6 +124,18 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadSavedBeneficiaries() async {
+    final apiService = ref.read(apiServiceProvider);
+    final beneficiaries =
+        await apiService.getSavedBeneficiariesForCurrentUser();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _savedBeneficiaries = beneficiaries;
+    });
   }
 
   bool _validateInputs() {
@@ -90,8 +148,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
     if (_fromAccountController.text == _toAccountController.text) {
       setState(
-        () =>
-            _errorMessage = 'From and To accounts cannot be the same',
+        () => _errorMessage = 'From and To accounts cannot be the same',
       );
       return false;
     }
@@ -104,6 +161,111 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       }
     } catch (e) {
       setState(() => _errorMessage = 'Invalid amount');
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<bool> _promptAndVerifyMpin() async {
+    final mpinController = TextEditingController();
+    bool obscure = true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('Enter MPIN'),
+              content: TextField(
+                controller: mpinController,
+                keyboardType: TextInputType.number,
+                obscureText: obscure,
+                maxLength: 4,
+                decoration: InputDecoration(
+                  hintText: '4-digit MPIN',
+                  counterText: '',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    onPressed: () {
+                      setLocalState(() => obscure = !obscure);
+                    },
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Verify'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return false;
+    }
+    if (!RegExp(r'^\d{4}$').hasMatch(mpinController.text)) {
+      return false;
+    }
+    final apiService = ref.read(apiServiceProvider);
+    return apiService.verifyMpinForCurrentUser(mpinController.text);
+  }
+
+  Future<bool> _validateDailyLimit(double newAmount) async {
+    final apiService = ref.read(apiServiceProvider);
+    final transactions =
+        await apiService.getTransactionHistory(_fromAccountController.text);
+    final now = DateTime.now();
+
+    bool isSameDay(DateTime a, DateTime b) {
+      return a.year == b.year && a.month == b.month && a.day == b.day;
+    }
+
+    double todaySent = 0;
+    for (final txn in transactions) {
+      if (txn.getFromAccount != _fromAccountController.text) {
+        continue;
+      }
+      final status = txn.status.toUpperCase();
+      if (status != 'SUCCESS' && status != 'COMPLETED') {
+        continue;
+      }
+      final rawDate = txn.getDate;
+      if (rawDate.isEmpty) {
+        continue;
+      }
+      DateTime? parsed;
+      try {
+        parsed = DateTime.parse(rawDate);
+      } catch (_) {
+        parsed = null;
+      }
+      if (parsed == null || !isSameDay(parsed, now)) {
+        continue;
+      }
+      todaySent += txn.amount;
+    }
+
+    final projected = todaySent + newAmount;
+    if (projected > _dailyTransferLimit) {
+      setState(() {
+        _errorMessage =
+            'Daily transfer limit exceeded. Today sent: ₹${todaySent.toStringAsFixed(2)}, limit: ₹${_dailyTransferLimit.toStringAsFixed(2)}';
+      });
       return false;
     }
 
@@ -143,14 +305,73 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                 ),
               ),
               SizedBox(height: 8.h),
-              TextField(
-                controller: _fromAccountController,
-                decoration: const InputDecoration(
-                  labelText: 'Enter account number',
-                  prefixIcon: Icon(Icons.account_balance),
-                  hintText: '1234567890',
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
-                enabled: !_isLoading,
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_fromAccountController.text.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Account Number',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: AppTheme.textLight,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _fromAccountController.text,
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Monaco',
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy_outlined),
+                                onPressed: () {
+                                  Clipboard.setData(
+                                    ClipboardData(
+                                        text: _fromAccountController.text),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Account number copied!'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                                iconSize: 18.sp,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                        ],
+                      ),
+                    TextField(
+                      controller: _fromAccountController,
+                      decoration: const InputDecoration(
+                        labelText: 'Enter account number',
+                        prefixIcon: Icon(Icons.account_balance),
+                        hintText: '1234567890',
+                        border: InputBorder.none,
+                      ),
+                      enabled:
+                          !_isLoading && widget.sourceAccountNumber == null,
+                    ),
+                  ],
+                ),
               ),
               SizedBox(height: 20.h),
 
@@ -164,14 +385,105 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                 ),
               ),
               SizedBox(height: 8.h),
-              TextField(
-                controller: _toAccountController,
-                decoration: const InputDecoration(
-                  labelText: 'Recipient account number',
-                  prefixIcon: Icon(Icons.person),
-                  hintText: '0987654321',
+              if (_savedBeneficiaries.isNotEmpty) ...[
+                Text(
+                  'Saved Beneficiaries',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: AppTheme.textLight,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                enabled: !_isLoading,
+                SizedBox(height: 8.h),
+                Wrap(
+                  spacing: 8.w,
+                  runSpacing: 8.h,
+                  children: _savedBeneficiaries
+                      .map(
+                        (beneficiary) => ActionChip(
+                          label: Text(
+                            beneficiary,
+                            style: TextStyle(fontSize: 11.sp),
+                          ),
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _toAccountController.text = beneficiary;
+                                  });
+                                },
+                        ),
+                      )
+                      .toList(),
+                ),
+                SizedBox(height: 10.h),
+              ],
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_toAccountController.text.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Recipient Account Number',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: AppTheme.textLight,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _toAccountController.text,
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Monaco',
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy_outlined),
+                                onPressed: () {
+                                  Clipboard.setData(
+                                    ClipboardData(
+                                        text: _toAccountController.text),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Account number copied!'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                                iconSize: 18.sp,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                        ],
+                      ),
+                    TextField(
+                      controller: _toAccountController,
+                      decoration: const InputDecoration(
+                        labelText: 'Recipient account number',
+                        prefixIcon: Icon(Icons.person),
+                        hintText: '0987654321',
+                        border: InputBorder.none,
+                      ),
+                      enabled: !_isLoading,
+                    ),
+                  ],
+                ),
               ),
               SizedBox(height: 20.h),
 

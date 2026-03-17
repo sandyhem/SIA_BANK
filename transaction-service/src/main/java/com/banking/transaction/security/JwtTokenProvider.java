@@ -28,6 +28,24 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
+    public Long getUserIdFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        Object userId = claims.get("userId");
+        if (userId != null) {
+            if (userId instanceof Number) {
+                return ((Number) userId).longValue();
+            } else if (userId instanceof String) {
+                return Long.parseLong((String) userId);
+            }
+        }
+        return null;
+    }
+
     public boolean validateToken(String authToken) {
         try {
             Jwts.parserBuilder()

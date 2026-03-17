@@ -148,6 +148,25 @@ curl http://localhost:8080/api/auth/health
 # Make sure firewall allows ports 8080-8082
 ```
 
+### Problem: "Transfer failed with HTTP 400"
+Cause:
+The transaction service validates transfer payload fields strictly.
+The request body must use backend field names:
+
+```json
+{
+	"fromAccountNumber": "...",
+	"toAccountNumber": "...",
+	"amount": 1000,
+	"description": "optional text"
+}
+```
+
+Checklist:
+- Ensure source and destination account numbers are valid and different
+- Ensure `amount` is greater than `0`
+- Check Flutter logs for `statusCode` and backend `response` details
+
 ### Problem: "Build failed - Gradle error"
 ```bash
 flutter clean

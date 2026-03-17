@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -39,13 +40,26 @@ public class PQJwtTokenProvider {
      */
     public String generateToken(Authentication authentication) {
         UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
-        return generateToken(userPrincipal.getUsername(), userPrincipal.getId());
+        String role = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(authority -> authority != null && authority.startsWith("ROLE_"))
+                .map(authority -> authority.substring("ROLE_".length()))
+                .findFirst()
+                .orElse("USER");
+        return generateToken(userPrincipal.getUsername(), userPrincipal.getId(), role);
     }
 
     /**
      * Generate token with custom userId (for login/register)
      */
     public String generateToken(String username, Long userId) {
+        return generateToken(username, userId, "USER");
+    }
+
+    /**
+     * Generate token with explicit role claim.
+     */
+    public String generateToken(String username, Long userId, String role) {
         try {
             Date now = new Date();
             Date expiryDate = new Date(now.getTime() + jwtExpiration);
@@ -61,6 +75,7 @@ public class PQJwtTokenProvider {
             payload.put("iat", now.getTime() / 1000);
             payload.put("exp", expiryDate.getTime() / 1000);
             payload.put("userId", userId);
+            payload.put("role", role);
             payload.put("pq", true);
 
             // Base64URL encode header and payload

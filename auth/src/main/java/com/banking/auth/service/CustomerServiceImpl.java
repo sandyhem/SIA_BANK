@@ -5,6 +5,9 @@ import com.banking.auth.dto.CustomerDTO;
 import com.banking.auth.dto.UpdateKycStatusDTO;
 import com.banking.auth.entity.Customer;
 import com.banking.auth.entity.User;
+import com.banking.auth.exception.CustomerNotFoundException;
+import com.banking.auth.exception.CustomerProfileAlreadyExistsException;
+import com.banking.auth.exception.InvalidKycStatusException;
 import com.banking.auth.repository.CustomerRepository;
 import com.banking.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -26,11 +30,11 @@ public class CustomerServiceImpl implements CustomerService {
     public CustomerDTO createCustomer(Long userId, CreateCustomerRequestDTO request) {
         // Check if user exists
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+                .orElseThrow(() -> new CustomerNotFoundException("User not found with ID: " + userId));
 
         // Check if customer already exists for this user
         if (customerRepository.existsByUserId(userId)) {
-            throw new RuntimeException("Customer profile already exists for this user");
+            throw new CustomerProfileAlreadyExistsException("Customer profile already exists for this user");
         }
 
         Customer customer = new Customer();
@@ -59,24 +63,43 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public CustomerDTO getCustomerByUserId(Long userId) {
         Customer customer = customerRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Customer not found for user ID: " + userId));
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found for user ID: " + userId));
         return mapToDTO(customer);
     }
 
     @Override
     public CustomerDTO getCustomerByCifNumber(String cifNumber) {
         Customer customer = customerRepository.findByCifNumber(cifNumber)
-                .orElseThrow(() -> new RuntimeException("Customer not found with CIF: " + cifNumber));
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found with CIF: " + cifNumber));
         return mapToDTO(customer);
     }
 
     @Override
     public CustomerDTO updateKycStatus(String cifNumber, UpdateKycStatusDTO updateRequest, String adminUsername) {
         Customer customer = customerRepository.findByCifNumber(cifNumber)
-                .orElseThrow(() -> new RuntimeException("Customer not found with CIF: " + cifNumber));
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found with CIF: " + cifNumber));
 
-        Customer.KycStatus newKycStatus = Customer.KycStatus.valueOf(updateRequest.getKycStatus().toUpperCase());
+        final String normalizedStatus = updateRequest.getKycStatus() == null
+                ? ""
+                : updateRequest.getKycStatus().trim().toUpperCase(Locale.ROOT);
+
+        final Customer.KycStatus newKycStatus;
+        try {
+            newKycStatus = Customer.KycStatus.valueOf(normalizedStatus);
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidKycStatusException(
+                    "Invalid kycStatus '" + updateRequest.getKycStatus()
+                            + "'. Allowed values: PENDING, UNDER_REVIEW, VERIFIED, REJECTED");
+        }
         customer.setKycStatus(newKycStatus);
+
+        // Keep User.kycStatus in sync because frontend KYC banner reads user KYC
+        // endpoint.
+        User linkedUser = customer.getUser();
+        if (linkedUser != null) {
+            linkedUser.setKycStatus(newKycStatus.name());
+            userRepository.save(linkedUser);
+        }
 
         // If KYC is verified, activate customer
         if (newKycStatus == Customer.KycStatus.VERIFIED) {

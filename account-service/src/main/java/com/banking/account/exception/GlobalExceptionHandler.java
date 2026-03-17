@@ -23,7 +23,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
-    @ExceptionHandler({ AccountInactiveException.class, InsufficientBalanceException.class })
+    @ExceptionHandler({ AccountInactiveException.class, InsufficientBalanceException.class,
+            DuplicateAccountTypeException.class })
     public ResponseEntity<Map<String, Object>> handleBusinessRule(RuntimeException ex) {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", OffsetDateTime.now());

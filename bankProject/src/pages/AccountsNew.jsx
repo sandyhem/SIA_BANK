@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QuantumLayout from '../components/QuantumLayout';
 import CreateAccountModal from '../components/CreateAccountModal';
+import TransactionHistory from '../components/TransactionHistory';
 import { useAuth } from '../context/AuthContext';
 import { accountService } from '../services/accountService';
 import { Plus, Banknote, Eye, EyeOff } from 'lucide-react';
@@ -138,54 +139,63 @@ export default function Accounts() {
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {accounts.map((account) => (
-                        <div
-                            key={account.id}
-                            className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border border-gray-200 hover:shadow-lg transition"
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                                    {account.accountType}
+                        <div key={account.id} className="space-y-6">
+                            {/* Account Card */}
+                            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border border-gray-200 hover:shadow-lg transition h-fit">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                                        {account.accountType}
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${account.accountStatus === 'ACTIVE'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-red-100 text-red-700'
+                                        }`}>
+                                        {account.accountStatus}
+                                    </div>
                                 </div>
-                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${account.accountStatus === 'ACTIVE'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-red-100 text-red-700'
-                                    }`}>
-                                    {account.accountStatus}
+
+                                <div className="mb-4">
+                                    <p className="text-sm text-gray-500 mb-1">Account Number</p>
+                                    <p className="text-lg font-mono font-semibold text-gray-900 break-all">
+                                        {account.accountNumber}
+                                    </p>
                                 </div>
+
+                                <div className="mb-4">
+                                    <p className="text-sm text-gray-500 mb-1">Current Balance</p>
+                                    <p className="text-3xl font-bold text-gray-900">
+                                        {showBalances
+                                            ? `₹${parseFloat(account.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                                            : '••••••'}
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                                    <div>
+                                        <p className="text-xs text-gray-500">Branch Code</p>
+                                        <p className="text-sm font-medium text-gray-900">{account.branchCode || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">IFSC Code</p>
+                                        <p className="text-sm font-medium text-gray-900">{account.ifscCode || 'N/A'}</p>
+                                    </div>
+                                </div>
+
+                                <button className="w-full mt-4 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 font-medium transition">
+                                    View Details
+                                </button>
                             </div>
 
-                            <div className="mb-4">
-                                <p className="text-sm text-gray-500 mb-1">Account Number</p>
-                                <p className="text-lg font-mono font-semibold text-gray-900">
-                                    {account.accountNumber}
-                                </p>
+                            {/* Recent Transactions */}
+                            <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Transactions</h3>
+                                <TransactionHistory
+                                    accountNumber={account.accountNumber}
+                                    limit={5}
+                                />
                             </div>
-
-                            <div className="mb-4">
-                                <p className="text-sm text-gray-500 mb-1">Current Balance</p>
-                                <p className="text-3xl font-bold text-gray-900">
-                                    {showBalances
-                                        ? `₹${parseFloat(account.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                                        : '••••••'}
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                                <div>
-                                    <p className="text-xs text-gray-500">Branch Code</p>
-                                    <p className="text-sm font-medium text-gray-900">{account.branchCode || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">IFSC Code</p>
-                                    <p className="text-sm font-medium text-gray-900">{account.ifscCode || 'N/A'}</p>
-                                </div>
-                            </div>
-
-                            <button className="w-full mt-4 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 font-medium transition">
-                                View Details
-                            </button>
                         </div>
                     ))}
                 </div>

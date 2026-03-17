@@ -34,18 +34,18 @@ Map<String, dynamic> _$TransactionDTOToJson(TransactionDTO instance) =>
 
 TransferRequestDTO _$TransferRequestDTOFromJson(Map<String, dynamic> json) =>
     TransferRequestDTO(
-      fromAccount: json['fromAccount'] as String,
-      toAccount: json['toAccount'] as String,
+      fromAccount: json['fromAccountNumber'] as String,
+      toAccount: json['toAccountNumber'] as String,
       amount: (json['amount'] as num).toDouble(),
-      narration: json['narration'] as String?,
+      narration: json['description'] as String?,
     );
 
 Map<String, dynamic> _$TransferRequestDTOToJson(TransferRequestDTO instance) =>
     <String, dynamic>{
-      'fromAccount': instance.fromAccount,
-      'toAccount': instance.toAccount,
+      'fromAccountNumber': instance.fromAccount,
+      'toAccountNumber': instance.toAccount,
       'amount': instance.amount,
-      'narration': instance.narration,
+      'description': instance.narration,
     };
 
 RecurringTransferDTO _$RecurringTransferDTOFromJson(

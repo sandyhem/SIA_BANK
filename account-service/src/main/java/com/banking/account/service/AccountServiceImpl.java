@@ -10,6 +10,7 @@ import com.banking.account.entity.Account;
 import com.banking.account.entity.AccountStatus;
 import com.banking.account.exception.AccountInactiveException;
 import com.banking.account.exception.AccountNotFoundException;
+import com.banking.account.exception.DuplicateAccountTypeException;
 import com.banking.account.exception.InsufficientBalanceException;
 import com.banking.account.exception.CustomerNotActiveException;
 import com.banking.account.repository.AccountRepository;
@@ -36,6 +37,7 @@ public class AccountServiceImpl implements AccountService {
     public AccountDTO getAccountByAccountNumber(String accountNumber) {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountNumber));
+        activateIfEligible(account);
         return mapToDTO(account);
     }
 
@@ -43,6 +45,8 @@ public class AccountServiceImpl implements AccountService {
     public void debitAccount(String accountNumber, DebitRequestDTO debitRequest) {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountNumber));
+
+        activateIfEligible(account);
 
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new AccountInactiveException("Account is not active");
@@ -61,6 +65,8 @@ public class AccountServiceImpl implements AccountService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountNumber));
 
+        activateIfEligible(account);
+
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new AccountInactiveException("Account is not active");
         }
@@ -72,12 +78,11 @@ public class AccountServiceImpl implements AccountService {
     @Override
     public AccountDTO createAccount(CreateAccountRequestDTO createRequest) {
         /**
-         * STANDARD BANKING FLOW:
-         * 1. User must be registered (authentication level)
-         * 2. Customer CIF must be created
-         * 3. KYC must be VERIFIED
-         * 4. Customer status must be ACTIVE
-         * Only then can account be opened
+         * Banking onboarding flow:
+         * 1. User must be registered
+         * 2. Customer CIF profile must exist
+         * 3. Account can be created before KYC verification
+         * 4. Account stays INACTIVE until admin verifies KYC and customer is ACTIVE
          */
 
         CustomerStatusDTO customer;
@@ -91,34 +96,32 @@ public class AccountServiceImpl implements AccountService {
                     "Unable to verify customer status. Please try again later.");
         }
 
-        // Check if Customer is ACTIVE (KYC must be VERIFIED for this)
-        if (!"ACTIVE".equalsIgnoreCase(customer.getCustomerStatus())) {
-            throw new CustomerNotActiveException(
-                    String.format("Customer account is %s. Only ACTIVE customers can open bank accounts. " +
-                            "Current KYC Status: %s. Please complete KYC verification.",
-                            customer.getCustomerStatus(), customer.getKycStatus()));
-        }
+        final String requestedType = createRequest.getAccountType() == null
+                ? "SAVINGS"
+                : createRequest.getAccountType().trim();
 
-        // Double check KYC status
-        if (!"VERIFIED".equalsIgnoreCase(customer.getKycStatus())) {
-            throw new CustomerNotActiveException(
-                    "KYC verification is required. Current status: " + customer.getKycStatus() +
-                            ". Please complete your KYC verification before opening an account.");
+        if (accountRepository.existsByUserIdAndAccountTypeIgnoreCase(createRequest.getUserId(), requestedType)) {
+            throw new DuplicateAccountTypeException(
+                    "Account type '" + requestedType.toUpperCase() + "' already exists for this user. "
+                            + "Only one account per type is allowed per person.");
         }
 
         // Generate account number
         String accountNumber = "ACC" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
-        // Create account with ACTIVE status and initial balance
+        final boolean isCustomerActive = "ACTIVE".equalsIgnoreCase(customer.getCustomerStatus())
+                && "VERIFIED".equalsIgnoreCase(customer.getKycStatus());
+
+        // Create account. Keep INACTIVE until KYC is verified.
         Account account = new Account();
         account.setAccountNumber(accountNumber);
         account.setAccountName(createRequest.getAccountName());
-        account.setAccountType(createRequest.getAccountType());
+        account.setAccountType(requestedType.toUpperCase());
         account.setCustomerCif(customer.getCifNumber());
         account.setUserId(createRequest.getUserId());
         account.setBalance(
                 createRequest.getInitialBalance() != null ? createRequest.getInitialBalance() : BigDecimal.ZERO);
-        account.setStatus(AccountStatus.ACTIVE);
+        account.setStatus(isCustomerActive ? AccountStatus.ACTIVE : AccountStatus.INACTIVE);
         account.setCreatedAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());
 
@@ -141,8 +144,30 @@ public class AccountServiceImpl implements AccountService {
 
     public java.util.List<AccountDTO> getAccountsByUserId(Long userId) {
         return accountRepository.findByUserId(userId).stream()
-                .map(this::mapToDTO)
+                .map(account -> {
+                    activateIfEligible(account);
+                    return mapToDTO(account);
+                })
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    private void activateIfEligible(Account account) {
+        if (account.getStatus() == AccountStatus.ACTIVE) {
+            return;
+        }
+
+        try {
+            CustomerStatusDTO customer = customerServiceClient.getCustomerByUserId(account.getUserId());
+            boolean eligible = "ACTIVE".equalsIgnoreCase(customer.getCustomerStatus())
+                    && "VERIFIED".equalsIgnoreCase(customer.getKycStatus());
+
+            if (eligible) {
+                account.setStatus(AccountStatus.ACTIVE);
+                accountRepository.save(account);
+            }
+        } catch (Exception ignored) {
+            // Keep current status when customer service is unavailable.
+        }
     }
 
     private AccountDTO mapToDTO(Account account) {

@@ -4,7 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../data/models/auth_models.dart';
-import '../../../data/services/api_service.dart';
+import 'account_onboarding_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -20,10 +20,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
   late TextEditingController _confirmPasswordController;
+  late TextEditingController _mpinController;
+  late TextEditingController _confirmMpinController;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _obscureMpin = true;
+  bool _obscureConfirmMpin = true;
   bool _agreedToTerms = false;
   String? _errorMessage;
 
@@ -36,6 +40,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _usernameController = TextEditingController();
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
+    _mpinController = TextEditingController();
+    _confirmMpinController = TextEditingController();
   }
 
   @override
@@ -46,6 +52,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _mpinController.dispose();
+    _confirmMpinController.dispose();
     super.dispose();
   }
 
@@ -70,6 +78,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
 
       final response = await apiService.register(request);
+      await apiService.setMpinForUser(
+        userId: response.userId,
+        mpin: _mpinController.text,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -79,7 +91,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
           ),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AccountOnboardingScreen(
+              userId: response.userId,
+              fullName:
+                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+            ),
+          ),
+        );
       }
     } catch (e) {
       setState(() => _errorMessage = _formatErrorMessage(e));
@@ -94,7 +114,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _emailController.text.trim().isEmpty ||
         _usernameController.text.trim().isEmpty ||
         _passwordController.text.isEmpty ||
-        _confirmPasswordController.text.isEmpty) {
+        _confirmPasswordController.text.isEmpty ||
+        _mpinController.text.isEmpty ||
+        _confirmMpinController.text.isEmpty) {
       setState(() => _errorMessage = 'Please fill in all fields');
       return false;
     }
@@ -116,6 +138,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() => _errorMessage = 'Passwords do not match');
+      return false;
+    }
+
+    if (!RegExp(r'^\d{4}$').hasMatch(_mpinController.text)) {
+      setState(() => _errorMessage = 'MPIN must be exactly 4 digits');
+      return false;
+    }
+
+    if (_mpinController.text != _confirmMpinController.text) {
+      setState(() => _errorMessage = 'MPIN does not match');
       return false;
     }
 
@@ -276,7 +308,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     onPressed: () {
                       setState(
-                        () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                        () =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword,
                       );
                     },
                   ),
@@ -290,6 +323,58 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   padding: EdgeInsets.only(bottom: 16.h),
                   child: _buildErrorBanner(_errorMessage!),
                 ),
+
+              // MPIN
+              TextField(
+                controller: _mpinController,
+                keyboardType: TextInputType.number,
+                obscureText: _obscureMpin,
+                maxLength: 4,
+                decoration: InputDecoration(
+                  labelText: 'Set 4-digit MPIN',
+                  hintText: '1234',
+                  counterText: '',
+                  prefixIcon: const Icon(Icons.pin_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureMpin
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscureMpin = !_obscureMpin);
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              // Confirm MPIN
+              TextField(
+                controller: _confirmMpinController,
+                keyboardType: TextInputType.number,
+                obscureText: _obscureConfirmMpin,
+                maxLength: 4,
+                decoration: InputDecoration(
+                  labelText: 'Confirm MPIN',
+                  hintText: '1234',
+                  counterText: '',
+                  prefixIcon: const Icon(Icons.pin_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmMpin
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    onPressed: () {
+                      setState(
+                        () => _obscureConfirmMpin = !_obscureConfirmMpin,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(height: 8.h),
 
               // Terms Checkbox
               Row(
@@ -374,7 +459,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     style: TextStyle(fontSize: 12.sp),
                   ),
                   GestureDetector(
-                    onTap: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onTap:
+                        _isLoading ? null : () => Navigator.of(context).pop(),
                     child: Text(
                       'Login',
                       style: TextStyle(

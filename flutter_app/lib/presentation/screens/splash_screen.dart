@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -20,12 +21,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Future<void> _navigateToNextScreen() async {
     // Simulating splash screen delay
     await Future.delayed(const Duration(seconds: 3));
-    
+
     if (!mounted) return;
-    
-    // Check if user is authenticated (from secure storage)
-    // For now, navigate to login
-    Navigator.of(context).pushReplacementNamed('/login');
+
+    final apiService = ref.read(apiServiceProvider);
+    final userId = await apiService.getCurrentUserId();
+
+    // Virtual admin session fallback (see ApiService.getCurrentUserId).
+    if (userId == -1 && mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+      return;
+    }
+
+    // For desktop reliability, continue when local session exists.
+    // JWT validation can fail transiently (service startup timing, storage backend)
+    // and should not immediately force a login screen.
+    if (userId != null && mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+      return;
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   @override

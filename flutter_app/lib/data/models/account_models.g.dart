@@ -32,17 +32,19 @@ Map<String, dynamic> _$AccountDTOToJson(AccountDTO instance) =>
 CreateAccountRequest _$CreateAccountRequestFromJson(
         Map<String, dynamic> json) =>
     CreateAccountRequest(
-      customerId: (json['customerId'] as num).toInt(),
+      userId: (json['userId'] as num).toInt(),
       accountType: json['accountType'] as String,
       initialBalance: (json['initialBalance'] as num).toDouble(),
+      accountName: json['accountName'] as String?,
     );
 
 Map<String, dynamic> _$CreateAccountRequestToJson(
         CreateAccountRequest instance) =>
     <String, dynamic>{
-      'customerId': instance.customerId,
+      'userId': instance.userId,
       'accountType': instance.accountType,
       'initialBalance': instance.initialBalance,
+      'accountName': instance.accountName,
     };
 
 DebitRequestDTO _$DebitRequestDTOFromJson(Map<String, dynamic> json) =>

@@ -14,4 +14,6 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     List<Account> findByUserId(Long userId);
 
     List<Account> findByCustomerCif(String customerCif);
+
+    boolean existsByUserIdAndAccountTypeIgnoreCase(Long userId, String accountType);
 }

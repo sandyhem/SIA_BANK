@@ -3,9 +3,12 @@ package com.banking.transaction.controller;
 import com.banking.transaction.dto.TransferRequestDTO;
 import com.banking.transaction.entity.Transaction;
 import com.banking.transaction.service.TransactionService;
+import com.banking.transaction.security.JwtTokenProvider;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
@@ -15,9 +18,11 @@ import java.util.Map;
 public class HealthController {
 
     private final TransactionService transactionService;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public HealthController(TransactionService transactionService) {
+    public HealthController(TransactionService transactionService, JwtTokenProvider jwtTokenProvider) {
         this.transactionService = transactionService;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     @GetMapping("/")
@@ -45,9 +50,33 @@ public class HealthController {
     }
 
     @PostMapping("/api/transactions/transfer")
-    public ResponseEntity<String> transferFunds(@Valid @RequestBody TransferRequestDTO transferRequest) {
-        String result = transactionService.transferFunds(transferRequest);
+    public ResponseEntity<String> transferFunds(
+            @Valid @RequestBody TransferRequestDTO transferRequest,
+            HttpServletRequest request) {
+
+        // Extract JWT token from request header
+        String token = getJwtFromRequest(request);
+        if (token == null) {
+            return ResponseEntity.status(401).body("Missing or invalid authentication token");
+        }
+
+        // Extract userId from token
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).body("Invalid token: userId not found");
+        }
+
+        // Call service with userId for authorization check
+        String result = transactionService.transferFunds(transferRequest, userId);
         return ResponseEntity.ok(result);
+    }
+
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring("Bearer ".length());
+        }
+        return null;
     }
 
     @GetMapping("/api/transactions/account/{accountNumber}")

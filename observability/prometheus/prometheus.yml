@@ -12,7 +12,7 @@ scrape_configs:
   
   - job_name: "ebpf-ssl-monitor"
     static_configs:
-      - targets: ["host.docker.internal:9100"]
+      - targets: ["host.docker.internal:9101"]
     metric_relabel_configs:
       - source_labels: [__name__]
         regex: 'ssl_.*'
