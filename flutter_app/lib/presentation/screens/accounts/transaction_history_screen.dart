@@ -31,6 +31,14 @@ class _TransactionHistoryScreenState
     _selectedAccountNumber = widget.initialAccountNumber ?? '';
   }
 
+  Future<void> _refreshTransactions() async {
+    if (_selectedAccountNumber.isEmpty) {
+      return;
+    }
+    ref.invalidate(transactionHistoryProvider(_selectedAccountNumber));
+    await ref.read(transactionHistoryProvider(_selectedAccountNumber).future);
+  }
+
   bool _isWithinDateRange(String dateString) {
     if (dateString.isEmpty || _selectedDateRange == 'all') return true;
 
@@ -148,371 +156,393 @@ class _TransactionHistoryScreenState
               return const Center(child: CircularProgressIndicator());
             }
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.all(16.w),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Account Selector
-                  Text(
-                    'Select Account',
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  DropdownButton<String>(
-                    isExpanded: true,
-                    value: _selectedAccountNumber,
-                    items: accounts
-                        .map((account) => DropdownMenuItem(
-                              value: account.accountNumber,
-                              child: Text(
-                                '${account.accountNumber} - ${account.type.toUpperCase()}',
-                                style: TextStyle(fontSize: 13.sp),
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedAccountNumber = value;
-                          _searchQuery = '';
-                          _selectedFilter = 'all';
-                          _selectedDateRange = 'all';
-                        });
-                      }
-                    },
-                  ),
-                  SizedBox(height: 20.h),
-
-                  // Filters Section
-                  Text(
-                    'Filters',
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-
-                  // Search Field
-                  TextField(
-                    onChanged: (value) {
-                      setState(() => _searchQuery = value);
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search by description or account...',
-                      hintStyle: TextStyle(
+            return RefreshIndicator(
+              onRefresh: _refreshTransactions,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(16.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Account Selector
+                    Text(
+                      'Select Account',
+                      style: TextStyle(
                         fontSize: 13.sp,
-                        color: AppTheme.textLight,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        size: 18.w,
-                        color: AppTheme.textLight,
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16.w,
-                        vertical: 12.h,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                        borderSide: BorderSide(
-                          color: AppTheme.textLight.withOpacity(0.2),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                        borderSide: const BorderSide(
-                          color: AppTheme.primaryColor,
-                        ),
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
                       ),
                     ),
-                  ),
-                  SizedBox(height: 12.h),
-
-                  // Transaction Type Filter
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildFilterChip(
-                          'All',
-                          'all',
-                          _selectedFilter == 'all',
-                          () => setState(() => _selectedFilter = 'all'),
-                        ),
-                      ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: _buildFilterChip(
-                          'Sent',
-                          'sent',
-                          _selectedFilter == 'sent',
-                          () => setState(() => _selectedFilter = 'sent'),
-                        ),
-                      ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: _buildFilterChip(
-                          'Received',
-                          'received',
-                          _selectedFilter == 'received',
-                          () => setState(() => _selectedFilter = 'received'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12.h),
-
-                  // Date Range Filter
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildDateChip('All Time', 'all'),
-                        SizedBox(width: 8.w),
-                        _buildDateChip('Today', 'today'),
-                        SizedBox(width: 8.w),
-                        _buildDateChip('Last 7 Days', 'week'),
-                        SizedBox(width: 8.w),
-                        _buildDateChip('Last 30 Days', 'month'),
-                        SizedBox(width: 8.w),
-                        _buildDateChip('Last Year', 'year'),
-                      ],
+                    SizedBox(height: 8.h),
+                    DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedAccountNumber,
+                      items: accounts
+                          .map((account) => DropdownMenuItem(
+                                value: account.accountNumber,
+                                child: Text(
+                                  '${account.accountNumber} - ${account.type.toUpperCase()}',
+                                  style: TextStyle(fontSize: 13.sp),
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _selectedAccountNumber = value;
+                            _searchQuery = '';
+                            _selectedFilter = 'all';
+                            _selectedDateRange = 'all';
+                          });
+                        }
+                      },
                     ),
-                  ),
-                  SizedBox(height: 20.h),
+                    SizedBox(height: 20.h),
 
-                  // Transactions List
-                  ref
-                      .watch(transactionHistoryProvider(_selectedAccountNumber))
-                      .when(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (err, stack) => Center(
-                          child: Text(
-                            'Error loading transactions: ${err.toString()}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
+                    // Filters Section
+                    Text(
+                      'Filters',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+
+                    // Search Field
+                    TextField(
+                      onChanged: (value) {
+                        setState(() => _searchQuery = value);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search by description or account...',
+                        hintStyle: TextStyle(
+                          fontSize: 13.sp,
+                          color: AppTheme.textLight,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 18.w,
+                          color: AppTheme.textLight,
+                        ),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16.w,
+                          vertical: 12.h,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                          borderSide: BorderSide(
+                            color: AppTheme.textLight.withOpacity(0.2),
                           ),
                         ),
-                        data: (transactions) {
-                          final filteredTransactions = _filterTransactions(
-                              transactions, _selectedAccountNumber);
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
 
-                          if (filteredTransactions.isEmpty) {
-                            return Center(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 32.h),
-                                child: Column(
+                    // Transaction Type Filter
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildFilterChip(
+                            'All',
+                            'all',
+                            _selectedFilter == 'all',
+                            () => setState(() => _selectedFilter = 'all'),
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: _buildFilterChip(
+                            'Sent',
+                            'sent',
+                            _selectedFilter == 'sent',
+                            () => setState(() => _selectedFilter = 'sent'),
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: _buildFilterChip(
+                            'Received',
+                            'received',
+                            _selectedFilter == 'received',
+                            () => setState(() => _selectedFilter = 'received'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12.h),
+
+                    // Date Range Filter
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildDateChip('All Time', 'all'),
+                          SizedBox(width: 8.w),
+                          _buildDateChip('Today', 'today'),
+                          SizedBox(width: 8.w),
+                          _buildDateChip('Last 7 Days', 'week'),
+                          SizedBox(width: 8.w),
+                          _buildDateChip('Last 30 Days', 'month'),
+                          SizedBox(width: 8.w),
+                          _buildDateChip('Last Year', 'year'),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 20.h),
+
+                    // Transactions List
+                    ref
+                        .watch(
+                            transactionHistoryProvider(_selectedAccountNumber))
+                        .when(
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (err, stack) => Center(
+                            child: Text(
+                              'Error loading transactions: ${err.toString()}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                          data: (transactions) {
+                            final filteredTransactions = _filterTransactions(
+                                transactions, _selectedAccountNumber);
+
+                            if (filteredTransactions.isEmpty) {
+                              return Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 32.h),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.inbox,
+                                        size: 48.w,
+                                        color: AppTheme.textLight,
+                                      ),
+                                      SizedBox(height: 12.h),
+                                      Text(
+                                        'No Transactions Found',
+                                        style: TextStyle(
+                                          fontSize: 14.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textDark,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            // Summary
+                            final sentTotal = _calculateTotal(
+                              filteredTransactions,
+                              'sent',
+                            );
+                            final receivedTotal = _calculateTotal(
+                              filteredTransactions,
+                              'received',
+                            );
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Summary Stats
+                                Row(
                                   children: [
-                                    Icon(
-                                      Icons.inbox,
-                                      size: 48.w,
-                                      color: AppTheme.textLight,
+                                    Expanded(
+                                      child: _buildSummaryCard(
+                                        'Total',
+                                        filteredTransactions.length.toString(),
+                                        Colors.blue,
+                                      ),
                                     ),
-                                    SizedBox(height: 12.h),
-                                    Text(
-                                      'No Transactions Found',
-                                      style: TextStyle(
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppTheme.textDark,
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: _buildSummaryCard(
+                                        'Sent',
+                                        '₹${sentTotal.toStringAsFixed(2)}',
+                                        Colors.red,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: _buildSummaryCard(
+                                        'Received',
+                                        '₹${receivedTotal.toStringAsFixed(2)}',
+                                        Colors.green,
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            );
-                          }
+                                SizedBox(height: 16.h),
 
-                          // Summary
-                          final sentTotal = _calculateTotal(
-                            filteredTransactions,
-                            'sent',
-                          );
-                          final receivedTotal = _calculateTotal(
-                            filteredTransactions,
-                            'received',
-                          );
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Summary Stats
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      'Total',
-                                      filteredTransactions.length.toString(),
-                                      Colors.blue,
+                                // Transactions List
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color:
+                                          AppTheme.textLight.withOpacity(0.1),
                                     ),
+                                    borderRadius: BorderRadius.circular(8.r),
                                   ),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      'Sent',
-                                      '₹${sentTotal.toStringAsFixed(2)}',
-                                      Colors.red,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      'Received',
-                                      '₹${receivedTotal.toStringAsFixed(2)}',
-                                      Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 16.h),
+                                  padding: EdgeInsets.all(12.w),
+                                  child: Column(
+                                    children: [
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        itemCount: filteredTransactions.length,
+                                        separatorBuilder: (context, index) =>
+                                            Divider(
+                                          height: 1.h,
+                                          color: AppTheme.textLight
+                                              .withOpacity(0.1),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final transaction =
+                                              filteredTransactions[index];
+                                          final isSent =
+                                              transaction.getFromAccount ==
+                                                  _selectedAccountNumber;
 
-                              // Transactions List
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: AppTheme.textLight.withOpacity(0.1),
-                                  ),
-                                  borderRadius: BorderRadius.circular(8.r),
-                                ),
-                                padding: EdgeInsets.all(12.w),
-                                child: Column(
-                                  children: [
-                                    ListView.separated(
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      itemCount: filteredTransactions.length,
-                                      separatorBuilder: (context, index) =>
-                                          Divider(
-                                        height: 1.h,
-                                        color:
-                                            AppTheme.textLight.withOpacity(0.1),
-                                      ),
-                                      itemBuilder: (context, index) {
-                                        final transaction =
-                                            filteredTransactions[index];
-                                        final isSent =
-                                            transaction.getFromAccount ==
-                                                _selectedAccountNumber;
-
-                                        return Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 12.h,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 40.w,
-                                                height: 40.w,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: (isSent
-                                                          ? Colors.red
-                                                          : Colors.green)
-                                                      .withOpacity(0.1),
-                                                ),
-                                                child: Center(
-                                                  child: Icon(
-                                                    isSent
-                                                        ? Icons.arrow_upward
-                                                        : Icons.arrow_downward,
-                                                    size: 18.w,
-                                                    color: isSent
-                                                        ? Colors.red
-                                                        : Colors.green,
+                                          return Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 12.h,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 40.w,
+                                                  height: 40.w,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: (isSent
+                                                            ? Colors.red
+                                                            : Colors.green)
+                                                        .withOpacity(0.1),
                                                   ),
-                                                ),
-                                              ),
-                                              SizedBox(width: 12.w),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      transaction
-                                                          .getDescription,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 13.sp,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color:
-                                                            AppTheme.textDark,
-                                                      ),
-                                                    ),
-                                                    SizedBox(height: 4.h),
-                                                    Text(
+                                                  child: Center(
+                                                    child: Icon(
                                                       isSent
-                                                          ? 'To: ${transaction.getToAccount}'
-                                                          : 'From: ${transaction.getFromAccount}',
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 11.sp,
-                                                        color:
-                                                            AppTheme.textLight,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              SizedBox(width: 8.w),
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.end,
-                                                children: [
-                                                  Text(
-                                                    '${isSent ? '−' : '+'}₹${transaction.amount.toStringAsFixed(2)}',
-                                                    style: TextStyle(
-                                                      fontSize: 13.sp,
-                                                      fontWeight:
-                                                          FontWeight.w700,
+                                                          ? Icons.arrow_upward
+                                                          : Icons
+                                                              .arrow_downward,
+                                                      size: 18.w,
                                                       color: isSent
                                                           ? Colors.red
                                                           : Colors.green,
                                                     ),
                                                   ),
-                                                  SizedBox(height: 2.h),
-                                                  Text(
-                                                    transaction.status
-                                                        .toUpperCase(),
-                                                    style: TextStyle(
-                                                      fontSize: 10.sp,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: transaction.status
-                                                                  .toUpperCase() ==
-                                                              'SUCCESS'
-                                                          ? Colors.green
-                                                          : Colors.orange,
-                                                    ),
+                                                ),
+                                                SizedBox(width: 12.w),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        transaction
+                                                            .getDescription,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 13.sp,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              AppTheme.textDark,
+                                                        ),
+                                                      ),
+                                                      SizedBox(height: 4.h),
+                                                      Text(
+                                                        isSent
+                                                            ? 'To: ${transaction.getToAccount}'
+                                                            : 'From: ${transaction.getSenderName}',
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11.sp,
+                                                          color: AppTheme
+                                                              .textLight,
+                                                        ),
+                                                      ),
+                                                      if (!isSent) ...[
+                                                        SizedBox(height: 2.h),
+                                                        Text(
+                                                          'A/C: ${transaction.getFromAccount}',
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 10.sp,
+                                                            color: AppTheme
+                                                                .textLight,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
+                                                ),
+                                                SizedBox(width: 8.w),
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.end,
+                                                  children: [
+                                                    Text(
+                                                      '${isSent ? '−' : '+'}₹${transaction.amount.toStringAsFixed(2)}',
+                                                      style: TextStyle(
+                                                        fontSize: 13.sp,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: isSent
+                                                            ? Colors.red
+                                                            : Colors.green,
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 2.h),
+                                                    Text(
+                                                      transaction.status
+                                                          .toUpperCase(),
+                                                      style: TextStyle(
+                                                        fontSize: 10.sp,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: transaction
+                                                                    .status
+                                                                    .toUpperCase() ==
+                                                                'SUCCESS'
+                                                            ? Colors.green
+                                                            : Colors.orange,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                ],
+                              ],
+                            );
+                          },
+                        ),
+                  ],
+                ),
               ),
             );
           },

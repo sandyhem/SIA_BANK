@@ -8,15 +8,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/auth_models.dart';
 
 class UserProfileViewData {
-  final int userId;
   final String username;
-  final String role;
   final CustomerDTO? customer;
 
   const UserProfileViewData({
-    required this.userId,
     required this.username,
-    required this.role,
     this.customer,
   });
 }
@@ -30,8 +26,6 @@ final userProfileViewProvider =
   }
 
   final username = (await api.getCurrentUsername())?.trim();
-  final role = (await api.getCurrentRole())?.trim().toUpperCase();
-
   CustomerDTO? customer;
   try {
     customer = await api.getCustomerByUserId(userId);
@@ -42,10 +36,8 @@ final userProfileViewProvider =
   }
 
   return UserProfileViewData(
-    userId: userId,
     username:
-        (username == null || username.isEmpty) ? 'User $userId' : username,
-    role: (role == null || role.isEmpty) ? 'USER' : role,
+        (username == null || username.isEmpty) ? 'Account Holder' : username,
     customer: customer,
   );
 });
@@ -77,8 +69,6 @@ class UserProfileScreen extends ConsumerWidget {
             padding: EdgeInsets.all(16.w),
             children: [
               _buildHeaderCard(context, data),
-              SizedBox(height: 12.h),
-              _buildSessionCard(data),
               SizedBox(height: 12.h),
               _buildCustomerCard(data.customer),
             ],
@@ -126,7 +116,7 @@ class UserProfileScreen extends ConsumerWidget {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  'Role: ${data.role}',
+                  'Verified Banking Customer',
                   style: TextStyle(
                     fontSize: 12.sp,
                     color: AppTheme.textLight,
@@ -135,33 +125,6 @@ class UserProfileScreen extends ConsumerWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionCard(UserProfileViewData data) {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Session Information',
-            style: TextStyle(
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(height: 10.h),
-          _buildFieldRow('User ID', data.userId.toString()),
-          _buildFieldRow('Username', data.username),
-          _buildFieldRow('Role', data.role),
         ],
       ),
     );

@@ -35,8 +35,38 @@ class AuthResponse {
     this.kycStatus,
   });
 
-  factory AuthResponse.fromJson(Map<String, dynamic> json) =>
-      _$AuthResponseFromJson(json);
+  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    int? parseInt(dynamic value) {
+      if (value is num) {
+        return value.toInt();
+      }
+      if (value is String) {
+        return int.tryParse(value.trim());
+      }
+      return null;
+    }
+
+    final userId = parseInt(json['userId']) ??
+        parseInt(json['customerId']) ??
+        parseInt(json['id']) ??
+        parseInt(json['user_id']) ??
+        0;
+
+    final token = (json['token'] ?? '').toString();
+    if (token.trim().isEmpty) {
+      throw const FormatException('Missing token in auth response');
+    }
+
+    return AuthResponse(
+      userId: userId,
+      token: token,
+      expiresIn: parseInt(json['expiresIn']),
+      message: json['message']?.toString(),
+      username: json['username']?.toString(),
+      role: json['role']?.toString(),
+      kycStatus: (json['kycStatus'] ?? json['status'])?.toString(),
+    );
+  }
 
   Map<String, dynamic> toJson() => _$AuthResponseToJson(this);
 }

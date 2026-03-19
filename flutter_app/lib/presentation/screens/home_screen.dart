@@ -12,17 +12,25 @@ import 'admin/admin_kyc_screen.dart';
 import 'accounts/open_account_screen.dart';
 import 'accounts/transfer_screen.dart';
 import 'accounts/transaction_history_screen.dart';
+import 'accounts/beneficiaries_screen.dart';
+import 'accounts/account_insights_screen.dart';
 import 'auth/account_onboarding_screen.dart';
 import 'profile/user_profile_screen.dart';
 
 // Providers for state management
 final currentUserIdProvider = FutureProvider.autoDispose<int>((ref) async {
   final apiService = ref.read(apiServiceProvider);
-  final userId = await apiService.getCurrentUserId();
-  if (userId == null) {
-    throw Exception('No active session found. Please login again.');
+  // Desktop storage backends can briefly lag right after login/logout.
+  // Retry a few times before considering the session missing.
+  for (var attempt = 0; attempt < 6; attempt++) {
+    final userId = await apiService.getCurrentUserId();
+    if (userId != null) {
+      return userId;
+    }
+    await Future.delayed(const Duration(milliseconds: 150));
   }
-  return userId;
+
+  throw Exception('No active session found. Please login again.');
 });
 
 final currentUserRoleProvider = FutureProvider.autoDispose<String>((ref) async {
@@ -119,34 +127,7 @@ class HomeScreen extends ConsumerWidget {
     }
 
     if (userIdAsyncValue.hasError || userIdAsyncValue.valueOrNull == null) {
-      return Scaffold(
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.w),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Session expired. Please login again.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14.sp),
-                ),
-                SizedBox(height: 12.h),
-                ElevatedButton(
-                  onPressed: () async {
-                    final apiService = ref.read(apiServiceProvider);
-                    await apiService.logout();
-                    if (context.mounted) {
-                      Navigator.pushReplacementNamed(context, '/login');
-                    }
-                  },
-                  child: const Text('Back To Login'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      return const _SessionRecoveryRedirect();
     }
 
     if (roleAsyncValue.hasError) {
@@ -709,7 +690,8 @@ class HomeScreen extends ConsumerWidget {
                 }
 
                 final selectedAccount = ref.read(selectedAccountProvider);
-                final transferResult = await Navigator.of(context).push<bool>(
+                final transferResult =
+                    await Navigator.of(context).push<Object?>(
                   MaterialPageRoute(
                     builder: (_) => TransferScreen(
                       sourceAccountNumber: selectedAccount?.accountNumber,
@@ -717,14 +699,35 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 );
 
-                if (transferResult == true) {
+                if (transferResult != null) {
                   ref.invalidate(accountsProvider);
-                  if (selectedAccount != null) {
+                  final refreshedAccount = transferResult is String
+                      ? transferResult
+                      : selectedAccount?.accountNumber;
+                  if (refreshedAccount != null && refreshedAccount.isNotEmpty) {
                     ref.invalidate(
-                      transactionHistoryProvider(selectedAccount.accountNumber),
+                      transactionHistoryProvider(refreshedAccount),
                     );
                   }
                 }
+              },
+            ),
+            _buildActionButton(
+              context,
+              'Beneficiaries',
+              Icons.people_alt_outlined,
+              columns: columns,
+              onTap: () {
+                final accounts = ref.read(accountsProvider).valueOrNull ?? [];
+                final account = ref.read(selectedAccountProvider) ??
+                    (accounts.isNotEmpty ? accounts.first : null);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => BeneficiariesScreen(
+                      sourceAccountNumber: account?.accountNumber,
+                    ),
+                  ),
+                );
               },
             ),
             _buildActionButton(
@@ -749,6 +752,19 @@ class HomeScreen extends ConsumerWidget {
                     builder: (_) => TransactionHistoryScreen(
                       initialAccountNumber: account.accountNumber,
                     ),
+                  ),
+                );
+              },
+            ),
+            _buildActionButton(
+              context,
+              'Insights',
+              Icons.insights_outlined,
+              columns: columns,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AccountInsightsScreen(),
                   ),
                 );
               },
@@ -1360,6 +1376,54 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SessionRecoveryRedirect extends ConsumerStatefulWidget {
+  const _SessionRecoveryRedirect();
+
+  @override
+  ConsumerState<_SessionRecoveryRedirect> createState() =>
+      _SessionRecoveryRedirectState();
+}
+
+class _SessionRecoveryRedirectState
+    extends ConsumerState<_SessionRecoveryRedirect> {
+  bool _handled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_handled) {
+      return;
+    }
+    _handled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final apiService = ref.read(apiServiceProvider);
+      for (var attempt = 0; attempt < 10 && mounted; attempt++) {
+        final userId = await apiService.getCurrentUserId();
+        if (userId != null) {
+          ref.invalidate(currentUserIdProvider);
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+          return;
+        }
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

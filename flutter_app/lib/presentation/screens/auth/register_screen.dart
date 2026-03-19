@@ -332,7 +332,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 maxLength: 4,
                 decoration: InputDecoration(
                   labelText: 'Set 4-digit MPIN',
-                  hintText: '1234',
+                  hintText: 'Enter 4-digit MPIN',
                   counterText: '',
                   prefixIcon: const Icon(Icons.pin_outlined),
                   suffixIcon: IconButton(
@@ -357,7 +357,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 maxLength: 4,
                 decoration: InputDecoration(
                   labelText: 'Confirm MPIN',
-                  hintText: '1234',
+                  hintText: 'Re-enter 4-digit MPIN',
                   counterText: '',
                   prefixIcon: const Icon(Icons.pin_outlined),
                   suffixIcon: IconButton(

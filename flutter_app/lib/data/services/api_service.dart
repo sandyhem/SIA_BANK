@@ -28,6 +28,7 @@ class ApiService {
   static const String _beneficiariesKeyPrefix = 'beneficiaries_user_';
   static final Map<String, String> _memorySession = <String, String>{};
   static SharedPreferences? _prefs;
+  static int? _lastAuthenticatedUserId;
 
   int? _sessionUserId;
   String? _sessionUsername;
@@ -246,14 +247,21 @@ class ApiService {
     AuthResponse authResponse, {
     required String fallbackUsername,
   }) async {
+    final resolvedUserId = authResponse.userId > 0
+        ? authResponse.userId
+        : (_extractUserIdFromToken(authResponse.token) ?? authResponse.userId);
+
     // Keep an in-memory session for immediate reads after auth.
-    _sessionUserId = authResponse.userId;
+    _sessionUserId = resolvedUserId;
+    if (resolvedUserId > 0) {
+      _lastAuthenticatedUserId = resolvedUserId;
+    }
     _sessionUsername = (authResponse.username ?? fallbackUsername).trim();
     _sessionRole = (authResponse.role ?? 'USER').toUpperCase();
     _sessionKycStatus = (authResponse.kycStatus ?? 'PENDING').toUpperCase();
 
     await _writeSessionValue(_jwtTokenKey, authResponse.token);
-    await _writeSessionValue(_userIdKey, authResponse.userId.toString());
+    await _writeSessionValue(_userIdKey, resolvedUserId.toString());
     await _writeSessionValue(_usernameKey, _sessionUsername);
     await _writeSessionValue(_roleKey, _sessionRole);
     await _writeSessionValue(_kycStatusKey, _sessionKycStatus);
@@ -394,11 +402,35 @@ class ApiService {
     if (_sessionUserId != null) {
       return _sessionUserId;
     }
-    final raw = await _readSessionValue(_userIdKey);
+
+    // On some desktop setups, storage backends can lag briefly right after
+    // login/logout transitions. Retry once before treating session as missing.
+    String? raw = await _readSessionValue(_userIdKey);
+    if (raw == null || raw.trim().isEmpty) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      raw = await _readSessionValue(_userIdKey);
+    }
+
     final parsed = int.tryParse(raw ?? '');
     if (parsed != null) {
       _sessionUserId = parsed;
       return parsed;
+    }
+
+    // Fallback: recover user id from JWT claims if user_id key is missing.
+    final token = await _readSessionValue(_jwtTokenKey);
+    final tokenUserId = _extractUserIdFromToken(token);
+    if (tokenUserId != null) {
+      _sessionUserId = tokenUserId;
+      await _writeSessionValue(_userIdKey, tokenUserId.toString());
+      return tokenUserId;
+    }
+
+    // Final fallback for immediate post-login navigation races.
+    if (_lastAuthenticatedUserId != null && _lastAuthenticatedUserId! > 0) {
+      _sessionUserId = _lastAuthenticatedUserId;
+      await _writeSessionValue(_userIdKey, _lastAuthenticatedUserId.toString());
+      return _lastAuthenticatedUserId;
     }
 
     // Admin fallback: allow admin-only app sections even when JWT cannot be
@@ -407,6 +439,45 @@ class ApiService {
     if ((role ?? '').toUpperCase().contains('ADMIN')) {
       _sessionUserId = -1;
       return _sessionUserId;
+    }
+
+    return null;
+  }
+
+  int? _extractUserIdFromToken(String? token) {
+    if (token == null || token.trim().isEmpty) {
+      return null;
+    }
+
+    final parts = token.split('.');
+    if (parts.length < 2) {
+      return null;
+    }
+
+    try {
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final claims = jsonDecode(decoded);
+      if (claims is! Map) {
+        return null;
+      }
+
+      const idKeys = <String>['userId', 'id', 'customerId', 'uid', 'user_id'];
+      for (final key in idKeys) {
+        final value = claims[key];
+        if (value is num) {
+          return value.toInt();
+        }
+        if (value is String) {
+          final parsed = int.tryParse(value.trim());
+          if (parsed != null) {
+            return parsed;
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore malformed token payload and continue with other fallbacks.
     }
 
     return null;
@@ -647,10 +718,19 @@ class ApiService {
   }
 
   Future<List<TransactionDTO>> getTransactionHistory(
-      String accountNumber) async {
+    String accountNumber, {
+    String? status,
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
     try {
       final response = await _transactionDio.get(
         '/api/transactions/account/$accountNumber',
+        queryParameters: {
+          if (status != null && status.trim().isNotEmpty) 'status': status,
+          if (fromDate != null) 'fromDate': fromDate.toIso8601String(),
+          if (toDate != null) 'toDate': toDate.toIso8601String(),
+        },
       );
       final List<dynamic> data = response.data;
       final transactions = <TransactionDTO>[];
@@ -670,6 +750,98 @@ class ApiService {
       return transactions;
     } on DioException catch (e) {
       _logger.e('Get transaction history error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<List<PayeeDTO>> getBeneficiaries() async {
+    try {
+      final response =
+          await _transactionDio.get('/api/transactions/beneficiaries');
+      final data = response.data;
+      if (data is! List) {
+        return const <PayeeDTO>[];
+      }
+      return data
+          .whereType<Map>()
+          .map((e) => PayeeDTO.fromJson(e.map((k, v) => MapEntry('$k', v))))
+          .toList();
+    } on DioException catch (e) {
+      _logger.e('Get beneficiaries error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<PayeeDTO> addBeneficiary({
+    required String nickname,
+    required String accountNumber,
+    required String bankName,
+    String? ifscCode,
+  }) async {
+    try {
+      final response = await _transactionDio.post(
+        '/api/transactions/beneficiaries',
+        data: {
+          'nickname': nickname,
+          'accountNumber': accountNumber,
+          'bankName': bankName,
+          if (ifscCode != null && ifscCode.trim().isNotEmpty)
+            'ifscCode': ifscCode,
+        },
+      );
+      final data = response.data;
+      if (data is Map) {
+        return PayeeDTO.fromJson(data.map((k, v) => MapEntry('$k', v)));
+      }
+      throw Exception('Invalid beneficiary response');
+    } on DioException catch (e) {
+      _logger.e('Add beneficiary error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<void> removeBeneficiary(int beneficiaryId) async {
+    try {
+      await _transactionDio
+          .delete('/api/transactions/beneficiaries/$beneficiaryId');
+    } on DioException catch (e) {
+      _logger.e('Remove beneficiary error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<PayeeDTO> setBeneficiaryFavorite({
+    required int beneficiaryId,
+    required bool favorite,
+  }) async {
+    try {
+      final response = await _transactionDio.patch(
+        '/api/transactions/beneficiaries/$beneficiaryId/favorite',
+        queryParameters: {'favorite': favorite},
+      );
+      final data = response.data;
+      if (data is Map) {
+        return PayeeDTO.fromJson(data.map((k, v) => MapEntry('$k', v)));
+      }
+      throw Exception('Invalid beneficiary response');
+    } on DioException catch (e) {
+      _logger.e('Favorite beneficiary error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<AccountInsightsDTO> getAccountInsights(String accountNumber) async {
+    try {
+      final response = await _transactionDio
+          .get('/api/transactions/account/$accountNumber/insights');
+      final data = response.data;
+      if (data is Map) {
+        return AccountInsightsDTO.fromJson(
+            data.map((k, v) => MapEntry('$k', v)));
+      }
+      throw Exception('Invalid account insights response');
+    } on DioException catch (e) {
+      _logger.e('Get account insights error: ${e.message}');
       rethrow;
     }
   }
@@ -710,6 +882,7 @@ class ApiService {
     _sessionUsername = null;
     _sessionRole = null;
     _sessionKycStatus = null;
+    _lastAuthenticatedUserId = null;
     _memorySession.clear();
 
     // Clear all secure storage keys

@@ -63,20 +63,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         final hasMpin = await apiService.hasMpinForCurrentUser();
         if (!hasMpin) {
           final mpin = await _promptSetupMpin();
-          if (mpin == null) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'MPIN setup is required to continue.';
-            });
-            return;
+          if (mpin != null) {
+            await apiService.setMpinForUser(
+                userId: response.userId, mpin: mpin);
           }
-          await apiService.setMpinForUser(userId: response.userId, mpin: mpin);
         }
       }
 
       if (mounted) {
+        final displayName = response.username?.trim().isNotEmpty == true
+            ? response.username!.trim()
+            : _usernameController.text.trim();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Welcome back, User ${response.userId}!')),
+          SnackBar(content: Text('Welcome back, $displayName.')),
         );
         Navigator.of(context).pushReplacementNamed('/home');
       }

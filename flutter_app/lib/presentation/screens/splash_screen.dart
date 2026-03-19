@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,16 +14,18 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  Timer? _navigationTimer;
+
   @override
   void initState() {
     super.initState();
-    _navigateToNextScreen();
+    _navigationTimer = Timer(
+      const Duration(seconds: 3),
+      () => _navigateToNextScreen(),
+    );
   }
 
   Future<void> _navigateToNextScreen() async {
-    // Simulating splash screen delay
-    await Future.delayed(const Duration(seconds: 3));
-
     if (!mounted) return;
 
     final apiService = ref.read(apiServiceProvider);
@@ -44,6 +48,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (mounted) {
       Navigator.of(context).pushReplacementNamed('/login');
     }
+  }
+
+  @override
+  void dispose() {
+    _navigationTimer?.cancel();
+    super.dispose();
   }
 
   @override

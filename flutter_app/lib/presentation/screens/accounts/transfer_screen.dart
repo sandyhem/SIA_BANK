@@ -4,48 +4,99 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../data/models/account_models.dart';
 import '../../../data/models/transaction_models.dart';
 
 class TransferScreen extends ConsumerStatefulWidget {
   final String? sourceAccountNumber;
+  final String? initialToAccountNumber;
 
-  const TransferScreen({Key? key, this.sourceAccountNumber}) : super(key: key);
+  const TransferScreen({
+    Key? key,
+    this.sourceAccountNumber,
+    this.initialToAccountNumber,
+  }) : super(key: key);
 
   @override
   ConsumerState<TransferScreen> createState() => _TransferScreenState();
 }
 
 class _TransferScreenState extends ConsumerState<TransferScreen> {
-  late TextEditingController _fromAccountController;
   late TextEditingController _toAccountController;
   late TextEditingController _amountController;
   late TextEditingController _narrationController;
 
   bool _isLoading = false;
+  bool _isLoadingAccounts = true;
   String? _errorMessage;
   String? _successMessage;
   List<String> _savedBeneficiaries = const <String>[];
+  List<AccountDTO> _accounts = const <AccountDTO>[];
+  String? _selectedFromAccount;
   static const double _dailyTransferLimit = 1000000.0;
 
   @override
   void initState() {
     super.initState();
-    _fromAccountController = TextEditingController(
-      text: widget.sourceAccountNumber ?? '',
-    );
     _toAccountController = TextEditingController();
+    if ((widget.initialToAccountNumber ?? '').trim().isNotEmpty) {
+      _toAccountController.text = widget.initialToAccountNumber!.trim();
+    }
     _amountController = TextEditingController();
     _narrationController = TextEditingController();
+    _selectedFromAccount = widget.sourceAccountNumber?.trim();
+    _loadAccounts();
     _loadSavedBeneficiaries();
   }
 
   @override
   void dispose() {
-    _fromAccountController.dispose();
     _toAccountController.dispose();
     _amountController.dispose();
     _narrationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAccounts() async {
+    setState(() {
+      _isLoadingAccounts = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final api = ref.read(apiServiceProvider);
+      final userId = await api.getCurrentUserId();
+      if (userId == null || userId <= 0) {
+        throw Exception('No active session found. Please login again.');
+      }
+
+      final accounts = await api.getAccountsByCustomer(userId);
+      if (!mounted) {
+        return;
+      }
+
+      final selected = _selectedFromAccount;
+      final hasSelected =
+          selected != null && accounts.any((a) => a.accountNumber == selected);
+
+      setState(() {
+        _accounts = accounts;
+        _selectedFromAccount = hasSelected
+            ? selected
+            : (accounts.isNotEmpty ? accounts.first.accountNumber : null);
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = 'Unable to load accounts: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingAccounts = false);
+      }
+    }
   }
 
   Future<void> _handleTransfer() async {
@@ -90,19 +141,27 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       }
 
       final request = TransferRequestDTO(
-        fromAccount: _fromAccountController.text,
+        fromAccount: _selectedFromAccount!.trim(),
         toAccount: _toAccountController.text,
         amount: amount,
         narration: _narrationController.text.isEmpty
-            ? 'Transfer from ${_fromAccountController.text} to ${_toAccountController.text}'
+            ? 'Digital funds transfer'
             : _narrationController.text,
       );
 
       final response = await apiService.transferFunds(request);
 
       // YONO-style quick transfer support: remember successful recipients.
-      if (_toAccountController.text.trim() !=
-          _fromAccountController.text.trim()) {
+      if (_toAccountController.text.trim() != _selectedFromAccount!.trim()) {
+        try {
+          await apiService.addBeneficiary(
+            nickname: 'Quick Pay ${_toAccountController.text.trim()}',
+            accountNumber: _toAccountController.text.trim(),
+            bankName: 'SIA Bank',
+          );
+        } catch (_) {
+          // Best effort only. Local fallback still preserves UX.
+        }
         await apiService.saveBeneficiaryForCurrentUser(
           _toAccountController.text.trim(),
         );
@@ -112,12 +171,14 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       setState(() => _successMessage = response);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transfer completed successfully!')),
+        ref.invalidate(beneficiariesProvider);
+        await _showPaymentSuccessAnimation(
+          amount: amount,
+          toAccount: _toAccountController.text.trim(),
         );
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) Navigator.of(context).pop(true);
-        });
+        if (mounted) {
+          Navigator.of(context).pop(_selectedFromAccount!.trim());
+        }
       }
     } catch (e) {
       setState(() => _errorMessage = 'Transfer failed: ${e.toString()}');
@@ -128,8 +189,18 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
   Future<void> _loadSavedBeneficiaries() async {
     final apiService = ref.read(apiServiceProvider);
-    final beneficiaries =
-        await apiService.getSavedBeneficiariesForCurrentUser();
+    List<String> beneficiaries;
+    try {
+      final backendBeneficiaries = await apiService.getBeneficiaries();
+      beneficiaries = backendBeneficiaries
+          .map((b) => b.accountNumber)
+          .where((value) => value.trim().isNotEmpty)
+          .toSet()
+          .toList();
+      beneficiaries.sort();
+    } catch (_) {
+      beneficiaries = await apiService.getSavedBeneficiariesForCurrentUser();
+    }
     if (!mounted) {
       return;
     }
@@ -139,14 +210,14 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
   }
 
   bool _validateInputs() {
-    if (_fromAccountController.text.isEmpty ||
+    if ((_selectedFromAccount ?? '').isEmpty ||
         _toAccountController.text.isEmpty ||
         _amountController.text.isEmpty) {
       setState(() => _errorMessage = 'Please fill in all fields');
       return false;
     }
 
-    if (_fromAccountController.text == _toAccountController.text) {
+    if (_selectedFromAccount!.trim() == _toAccountController.text.trim()) {
       setState(
         () => _errorMessage = 'From and To accounts cannot be the same',
       );
@@ -227,8 +298,8 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
   Future<bool> _validateDailyLimit(double newAmount) async {
     final apiService = ref.read(apiServiceProvider);
-    final transactions =
-        await apiService.getTransactionHistory(_fromAccountController.text);
+    final sourceAccount = _selectedFromAccount!.trim();
+    final transactions = await apiService.getTransactionHistory(sourceAccount);
     final now = DateTime.now();
 
     bool isSameDay(DateTime a, DateTime b) {
@@ -237,7 +308,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
     double todaySent = 0;
     for (final txn in transactions) {
-      if (txn.getFromAccount != _fromAccountController.text) {
+      if (txn.getFromAccount != sourceAccount) {
         continue;
       }
       final status = txn.status.toUpperCase();
@@ -270,6 +341,74 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
     }
 
     return true;
+  }
+
+  Future<void> _showPaymentSuccessAnimation({
+    required double amount,
+    required String toAccount,
+  }) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        final navigator = Navigator.of(context);
+        return Dialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Padding(
+            padding: EdgeInsets.all(20.w),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.7, end: 1),
+              duration: const Duration(milliseconds: 650),
+              curve: Curves.easeOutBack,
+              onEnd: () {
+                Future.delayed(const Duration(milliseconds: 600), () {
+                  if (!mounted) {
+                    return;
+                  }
+                  if (navigator.canPop()) {
+                    navigator.pop();
+                  }
+                });
+              },
+              builder: (context, value, child) {
+                return Transform.scale(scale: value, child: child);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 30.r,
+                    backgroundColor: Colors.green.withOpacity(0.12),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 42.sp,
+                    ),
+                  ),
+                  SizedBox(height: 14.h),
+                  Text(
+                    'Payment Successful',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    'INR ${amount.toStringAsFixed(2)} sent to $toAccount',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      color: AppTheme.textLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -310,69 +449,49 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                   border: Border.all(color: Colors.grey[300]!),
                   borderRadius: BorderRadius.circular(8.r),
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_fromAccountController.text.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Account Number',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              color: AppTheme.textLight,
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _fromAccountController.text,
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'Monaco',
-                                  letterSpacing: 1.0,
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                child: _isLoadingAccounts
+                    ? Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.h),
+                        child: const LinearProgressIndicator(minHeight: 2),
+                      )
+                    : DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _selectedFromAccount,
+                          hint: const Text('Select account'),
+                          items: _accounts
+                              .map(
+                                (account) => DropdownMenuItem<String>(
+                                  value: account.accountNumber,
+                                  child: Text(
+                                    '${account.accountNumber} • ${account.type.toUpperCase()}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.copy_outlined),
-                                onPressed: () {
-                                  Clipboard.setData(
-                                    ClipboardData(
-                                        text: _fromAccountController.text),
-                                  );
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Account number copied!'),
-                                      duration: Duration(seconds: 1),
-                                    ),
-                                  );
+                              )
+                              .toList(),
+                          onChanged: _isLoading ||
+                                  _accounts.isEmpty ||
+                                  widget.sourceAccountNumber != null
+                              ? null
+                              : (value) {
+                                  setState(() => _selectedFromAccount = value);
                                 },
-                                iconSize: 18.sp,
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 12.h),
-                        ],
+                        ),
                       ),
-                    TextField(
-                      controller: _fromAccountController,
-                      decoration: const InputDecoration(
-                        labelText: 'Enter account number',
-                        prefixIcon: Icon(Icons.account_balance),
-                        hintText: '1234567890',
-                        border: InputBorder.none,
-                      ),
-                      enabled:
-                          !_isLoading && widget.sourceAccountNumber == null,
-                    ),
-                  ],
-                ),
               ),
+              if (!_isLoadingAccounts && _accounts.isEmpty)
+                Padding(
+                  padding: EdgeInsets.only(top: 8.h),
+                  child: Text(
+                    'No eligible account available for transfer.',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppTheme.textLight,
+                    ),
+                  ),
+                ),
               SizedBox(height: 20.h),
 
               // To Account
@@ -477,7 +596,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Recipient account number',
                         prefixIcon: Icon(Icons.person),
-                        hintText: '0987654321',
+                        hintText: 'Enter beneficiary account number',
                         border: InputBorder.none,
                       ),
                       enabled: !_isLoading,
@@ -504,7 +623,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                   labelText: 'Enter amount',
                   prefixIcon: Icon(Icons.currency_rupee),
                   prefixText: '₹ ',
-                  hintText: '1000',
+                  hintText: 'Amount in INR',
                 ),
                 enabled: !_isLoading,
               ),
@@ -523,7 +642,8 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
               TextField(
                 controller: _narrationController,
                 decoration: const InputDecoration(
-                  labelText: 'e.g., Room rent, Salary',
+                  labelText: 'Payment reference',
+                  hintText: 'Optional note for statement records',
                   prefixIcon: Icon(Icons.note),
                 ),
                 maxLines: 2,

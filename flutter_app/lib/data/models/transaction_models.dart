@@ -43,6 +43,9 @@ class TransactionDTO {
   @JsonKey(name: 'createdAt')
   final String? createdAt;
 
+  @JsonKey(name: 'senderName')
+  final String? senderName;
+
   TransactionDTO({
     required this.transactionId,
     required this.type,
@@ -57,12 +60,20 @@ class TransactionDTO {
     this.description,
     this.reference,
     this.createdAt,
+    this.senderName,
   });
 
   String get getFromAccount => fromAccountNumber ?? fromAccount ?? '';
   String get getToAccount => toAccountNumber ?? toAccount ?? '';
   String get getDescription => description ?? narration ?? 'Transfer';
   String get getDate => createdAt ?? date ?? '';
+  String get getSenderName {
+    final value = senderName?.trim();
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+    return getFromAccount;
+  }
 
   factory TransactionDTO.fromJson(Map<String, dynamic> json) => TransactionDTO(
         transactionId: (json['transactionId'] ?? json['id'] ?? '').toString(),
@@ -83,6 +94,7 @@ class TransactionDTO {
         description: json['description']?.toString(),
         reference: (json['reference'] ?? json['referenceNumber'])?.toString(),
         createdAt: (json['createdAt'] ?? json['timestamp'])?.toString(),
+        senderName: json['senderName']?.toString(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -99,6 +111,7 @@ class TransactionDTO {
         'description': description,
         'reference': reference,
         'createdAt': createdAt,
+        'senderName': senderName,
       };
 }
 
@@ -263,4 +276,85 @@ class AlertDTO {
       _$AlertDTOFromJson(json);
 
   Map<String, dynamic> toJson() => _$AlertDTOToJson(this);
+}
+
+class PayeeDTO {
+  final int id;
+  final String nickname;
+  final String accountNumber;
+  final String bankName;
+  final String? ifscCode;
+  final bool favorite;
+  final String? createdAt;
+
+  PayeeDTO({
+    required this.id,
+    required this.nickname,
+    required this.accountNumber,
+    required this.bankName,
+    this.ifscCode,
+    required this.favorite,
+    this.createdAt,
+  });
+
+  factory PayeeDTO.fromJson(Map<String, dynamic> json) {
+    return PayeeDTO(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      nickname: (json['nickname'] ?? '').toString(),
+      accountNumber: (json['accountNumber'] ?? '').toString(),
+      bankName: (json['bankName'] ?? '').toString(),
+      ifscCode: json['ifscCode']?.toString(),
+      favorite: json['favorite'] == true,
+      createdAt: json['createdAt']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nickname': nickname,
+      'accountNumber': accountNumber,
+      'bankName': bankName,
+      'ifscCode': ifscCode,
+      'favorite': favorite,
+      'createdAt': createdAt,
+    };
+  }
+}
+
+class AccountInsightsDTO {
+  final String accountNumber;
+  final int totalTransactions;
+  final double totalSent;
+  final double totalReceived;
+  final double totalSuccessSent;
+  final double totalSuccessReceived;
+  final String? lastTransactionAt;
+
+  AccountInsightsDTO({
+    required this.accountNumber,
+    required this.totalTransactions,
+    required this.totalSent,
+    required this.totalReceived,
+    required this.totalSuccessSent,
+    required this.totalSuccessReceived,
+    this.lastTransactionAt,
+  });
+
+  factory AccountInsightsDTO.fromJson(Map<String, dynamic> json) {
+    double toDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse('${value ?? 0}') ?? 0.0;
+    }
+
+    return AccountInsightsDTO(
+      accountNumber: (json['accountNumber'] ?? '').toString(),
+      totalTransactions: (json['totalTransactions'] as num?)?.toInt() ?? 0,
+      totalSent: toDouble(json['totalSent']),
+      totalReceived: toDouble(json['totalReceived']),
+      totalSuccessSent: toDouble(json['totalSuccessSent']),
+      totalSuccessReceived: toDouble(json['totalSuccessReceived']),
+      lastTransactionAt: json['lastTransactionAt']?.toString(),
+    );
+  }
 }

@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findByFromAccountNumberOrToAccountNumber(String fromAccount, String toAccount);
+
+    List<Transaction> findByFromAccountNumberOrToAccountNumberOrderByCreatedAtDesc(String fromAccount,
+            String toAccount);
 }

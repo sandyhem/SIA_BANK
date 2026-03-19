@@ -5,42 +5,40 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "beneficiaries", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "userId", "accountNumber" })
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Transaction {
+public class Beneficiary {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String transactionId;
+    @Column(nullable = false)
+    private Long userId;
 
     @Column(nullable = false)
-    private String fromAccountNumber;
+    private String nickname;
 
     @Column(nullable = false)
-    private String toAccountNumber;
-
-    @Column(nullable = false, precision = 19, scale = 2)
-    private BigDecimal amount;
-
-    private String description;
+    private String accountNumber;
 
     @Column(nullable = false)
-    private String status;
+    private String bankName;
+
+    private String ifscCode;
+
+    @Column(nullable = false)
+    private boolean favorite = false;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-
-    @Transient
-    private String senderName;
 
     @PrePersist
     protected void onCreate() {

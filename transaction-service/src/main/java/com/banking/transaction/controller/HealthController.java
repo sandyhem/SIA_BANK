@@ -1,15 +1,20 @@
 package com.banking.transaction.controller;
 
+import com.banking.transaction.dto.AccountInsightsDTO;
+import com.banking.transaction.dto.BeneficiaryDTO;
+import com.banking.transaction.dto.BeneficiaryRequestDTO;
 import com.banking.transaction.dto.TransferRequestDTO;
 import com.banking.transaction.entity.Transaction;
 import com.banking.transaction.service.TransactionService;
 import com.banking.transaction.security.JwtTokenProvider;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,8 +85,109 @@ public class HealthController {
     }
 
     @GetMapping("/api/transactions/account/{accountNumber}")
-    public ResponseEntity<List<Transaction>> getTransactionHistory(@PathVariable String accountNumber) {
-        List<Transaction> transactions = transactionService.getTransactionsByAccount(accountNumber);
+    public ResponseEntity<List<Transaction>> getTransactionHistory(
+            @PathVariable String accountNumber,
+            HttpServletRequest request,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate) {
+        String token = getJwtFromRequest(request);
+        if (token == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        List<Transaction> transactions = transactionService.getTransactionsByAccountFiltered(
+                accountNumber,
+                userId,
+                status,
+                fromDate,
+                toDate);
         return ResponseEntity.ok(transactions);
+    }
+
+    @GetMapping("/api/transactions/account/{accountNumber}/insights")
+    public ResponseEntity<AccountInsightsDTO> getAccountInsights(
+            @PathVariable String accountNumber,
+            HttpServletRequest request) {
+        String token = getJwtFromRequest(request);
+        if (token == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        return ResponseEntity.ok(transactionService.getAccountInsights(accountNumber, userId));
+    }
+
+    @GetMapping("/api/transactions/beneficiaries")
+    public ResponseEntity<List<BeneficiaryDTO>> getBeneficiaries(HttpServletRequest request) {
+        String token = getJwtFromRequest(request);
+        if (token == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(transactionService.getBeneficiaries(userId));
+    }
+
+    @PostMapping("/api/transactions/beneficiaries")
+    public ResponseEntity<BeneficiaryDTO> addBeneficiary(
+            @Valid @RequestBody BeneficiaryRequestDTO request,
+            HttpServletRequest httpRequest) {
+        String token = getJwtFromRequest(httpRequest);
+        if (token == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        BeneficiaryDTO response = transactionService.addBeneficiary(userId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/api/transactions/beneficiaries/{beneficiaryId}")
+    public ResponseEntity<Void> deleteBeneficiary(
+            @PathVariable Long beneficiaryId,
+            HttpServletRequest request) {
+        String token = getJwtFromRequest(request);
+        if (token == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        transactionService.deleteBeneficiary(userId, beneficiaryId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/api/transactions/beneficiaries/{beneficiaryId}/favorite")
+    public ResponseEntity<BeneficiaryDTO> setBeneficiaryFavorite(
+            @PathVariable Long beneficiaryId,
+            @RequestParam boolean favorite,
+            HttpServletRequest request) {
+        String token = getJwtFromRequest(request);
+        if (token == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        return ResponseEntity.ok(transactionService.setBeneficiaryFavorite(userId, beneficiaryId, favorite));
     }
 }
