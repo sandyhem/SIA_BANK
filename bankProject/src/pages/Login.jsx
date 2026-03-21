@@ -22,7 +22,14 @@ export default function Login() {
             await login(credentials);
             navigate('/');
         } catch (err) {
-            setError(err.response?.data?.message || 'Invalid username or password');
+            const backendMessage = err?.response?.data?.message;
+            if (backendMessage) {
+                setError(backendMessage);
+            } else if (!err?.response) {
+                setError('Unable to reach auth service. Verify TLS mode/URL and that backend services are running.');
+            } else {
+                setError('Invalid username or password');
+            }
         } finally {
             setLoading(false);
         }

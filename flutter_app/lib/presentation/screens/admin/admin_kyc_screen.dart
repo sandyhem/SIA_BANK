@@ -22,6 +22,14 @@ class AdminKycScreen extends ConsumerStatefulWidget {
 
 class _AdminKycScreenState extends ConsumerState<AdminKycScreen> {
   bool _updating = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _statusFilter = 'PENDING_REVIEW';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _updateKyc(CustomerDTO customer, String newStatus) async {
     setState(() => _updating = true);
@@ -74,6 +82,133 @@ class _AdminKycScreenState extends ConsumerState<AdminKycScreen> {
     }
   }
 
+  List<CustomerDTO> _applyFilters(List<CustomerDTO> customers) {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return customers.where((customer) {
+      final status = customer.kycStatus.toUpperCase();
+      final matchesStatus = switch (_statusFilter) {
+        'ALL' => true,
+        'VERIFIED' => status == 'VERIFIED',
+        'REJECTED' => status == 'REJECTED',
+        'UNDER_REVIEW' => status == 'UNDER_REVIEW',
+        _ => status != 'VERIFIED',
+      };
+
+      if (!matchesStatus) {
+        return false;
+      }
+
+      if (query.isEmpty) {
+        return true;
+      }
+
+      final fullName = customer.fullName.toLowerCase();
+      final cif = customer.cifNumber.toLowerCase();
+      final userId = customer.userId.toString();
+      final phone = (customer.phoneNumber ?? '').toLowerCase();
+      final pan = (customer.panNumber ?? '').toLowerCase();
+      return fullName.contains(query) ||
+          cif.contains(query) ||
+          userId.contains(query) ||
+          phone.contains(query) ||
+          pan.contains(query);
+    }).toList();
+  }
+
+  Future<void> _showCustomerDetails(CustomerDTO customer) async {
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(customer.fullName),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _detailRow('Customer ID', customer.customerId.toString()),
+                _detailRow('User ID', customer.userId.toString()),
+                _detailRow('CIF', customer.cifNumber),
+                _detailRow('KYC Status', customer.kycStatus),
+                if ((customer.customerStatus ?? '').isNotEmpty)
+                  _detailRow('Customer Status', customer.customerStatus!),
+                if ((customer.phoneNumber ?? '').isNotEmpty)
+                  _detailRow('Phone', customer.phoneNumber!),
+                if ((customer.address ?? '').isNotEmpty)
+                  _detailRow('Address', customer.address!),
+                if ((customer.panNumber ?? '').isNotEmpty)
+                  _detailRow('PAN', customer.panNumber!),
+                if ((customer.aadhaarNumber ?? '').isNotEmpty)
+                  _detailRow('Aadhaar', customer.aadhaarNumber!),
+                if ((customer.createdAt ?? '').isNotEmpty)
+                  _detailRow('Created At', customer.createdAt!),
+                if ((customer.kycVerifiedAt ?? '').isNotEmpty)
+                  _detailRow('KYC Verified At', customer.kycVerifiedAt!),
+                if ((customer.kycVerifiedBy ?? '').isNotEmpty)
+                  _detailRow('KYC Verified By', customer.kycVerifiedBy!),
+              ],
+            ),
+          ),
+          actions: [
+            if (customer.kycStatus.toUpperCase() != 'UNDER_REVIEW')
+              TextButton(
+                onPressed: _updating
+                    ? null
+                    : () async {
+                        Navigator.of(context).pop();
+                        await _updateKyc(customer, 'UNDER_REVIEW');
+                      },
+                child: const Text('Mark Under Review'),
+              ),
+            if (customer.kycStatus.toUpperCase() != 'REJECTED')
+              TextButton(
+                onPressed: _updating
+                    ? null
+                    : () async {
+                        Navigator.of(context).pop();
+                        await _updateKyc(customer, 'REJECTED');
+                      },
+                child: const Text('Reject'),
+              ),
+            if (customer.kycStatus.toUpperCase() != 'VERIFIED')
+              ElevatedButton(
+                onPressed: _updating
+                    ? null
+                    : () async {
+                        Navigator.of(context).pop();
+                        await _updateKyc(customer, 'VERIFIED');
+                      },
+                child: const Text('Verify'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 12.sp, color: AppTheme.textDark),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final customersAsync = ref.watch(adminCustomersProvider);
@@ -85,14 +220,11 @@ class _AdminKycScreenState extends ConsumerState<AdminKycScreen> {
         error: (error, _) =>
             Center(child: Text('Failed to load customers: $error')),
         data: (customers) {
-          final pendingCustomers = customers
-              .where((c) => c.kycStatus.toUpperCase() != 'VERIFIED')
-              .toList();
+          final filteredCustomers = _applyFilters(customers);
 
-          if (pendingCustomers.isEmpty) {
+          if (filteredCustomers.isEmpty) {
             return const Center(
-              child:
-                  Text('No pending KYC records. All customers are verified.'),
+              child: Text('No customers match current filters.'),
             );
           }
 
@@ -100,10 +232,80 @@ class _AdminKycScreenState extends ConsumerState<AdminKycScreen> {
             onRefresh: () async => ref.refresh(adminCustomersProvider.future),
             child: ListView.separated(
               padding: EdgeInsets.all(16.w),
-              itemCount: pendingCustomers.length,
+              itemCount: filteredCustomers.length + 1,
               separatorBuilder: (_, __) => SizedBox(height: 10.h),
               itemBuilder: (context, index) {
-                final customer = pendingCustomers[index];
+                if (index == 0) {
+                  return Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: AppTheme.borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Search Customer',
+                            hintText: 'Name / CIF / User ID / Phone / PAN',
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                        ),
+                        SizedBox(height: 10.h),
+                        DropdownButtonFormField<String>(
+                          initialValue: _statusFilter,
+                          decoration: const InputDecoration(
+                            labelText: 'KYC Status Filter',
+                            prefixIcon: Icon(Icons.filter_alt_outlined),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'PENDING_REVIEW',
+                              child: Text('Pending + Under Review + Rejected'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'ALL',
+                              child: Text('All Customers'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'VERIFIED',
+                              child: Text('Verified'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'UNDER_REVIEW',
+                              child: Text('Under Review'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'REJECTED',
+                              child: Text('Rejected'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setState(() => _statusFilter = value);
+                          },
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Results: ${filteredCustomers.length}',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final customer = filteredCustomers[index - 1];
                 return Container(
                   padding: EdgeInsets.all(14.w),
                   decoration: BoxDecoration(
@@ -190,6 +392,16 @@ class _AdminKycScreenState extends ConsumerState<AdminKycScreen> {
                       SizedBox(height: 12.h),
                       Row(
                         children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _updating
+                                  ? null
+                                  : () => _showCustomerDetails(customer),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('View'),
+                            ),
+                          ),
+                          SizedBox(width: 10.w),
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: _updating

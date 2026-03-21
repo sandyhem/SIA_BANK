@@ -7,6 +7,17 @@ from collections import Counter, defaultdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
+DEFAULT_ALERT_TYPES = [
+    "LATERAL_MOVEMENT_PATTERN",
+    "PROCESS_PORT_MISMATCH",
+    "UNAUTHORIZED_FLOW",
+    "HIGH_FANOUT_FLOW",
+    "SLOW_CONNECTION",
+]
+
+DEFAULT_ALERT_SEVERITIES = ["critical", "high", "medium", "warning", "info"]
+
+
 class MetricsState:
     def __init__(self):
         self.lock = threading.Lock()
@@ -64,14 +75,22 @@ class MetricsState:
                 "# HELP ebpf_alerts_by_type_total Alerts by alert type",
                 "# TYPE ebpf_alerts_by_type_total counter",
             ])
-            for key, value in sorted(self.alerts_by_type.items()):
+
+            alert_types = set(DEFAULT_ALERT_TYPES)
+            alert_types.update(self.alerts_by_type.keys())
+            for key in sorted(alert_types):
+                value = self.alerts_by_type.get(key, 0)
                 lines.append(f'ebpf_alerts_by_type_total{{alert_type="{key}"}} {value}')
 
             lines.extend([
                 "# HELP ebpf_alerts_by_severity_total Alerts by severity",
                 "# TYPE ebpf_alerts_by_severity_total counter",
             ])
-            for key, value in sorted(self.alerts_by_severity.items()):
+
+            severities = set(DEFAULT_ALERT_SEVERITIES)
+            severities.update(self.alerts_by_severity.keys())
+            for key in sorted(severities):
+                value = self.alerts_by_severity.get(key, 0)
                 lines.append(f'ebpf_alerts_by_severity_total{{severity="{key}"}} {value}')
 
             lines.extend([

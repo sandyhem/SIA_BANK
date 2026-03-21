@@ -7,8 +7,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
-EBPF_DIR="$SCRIPT_DIR/ebpf"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+EBPF_DIR="$PROJECT_ROOT/ebpf"
 LOG_DIR="$PROJECT_ROOT/logs"
 
 # Configuration

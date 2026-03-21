@@ -28,8 +28,10 @@ export const AuthProvider = ({ children }) => {
 
             // Try to fetch latest customer data if user exists
             if (currentUser.id) {
-                fetchCustomerProfile(currentUser.id).catch(() => {
+                fetchCustomerProfile(currentUser.id).catch((error) => {
                     // If fetch fails, keep existing customer data from localStorage
+                    // Don't cause navigation - just silently fail
+                    console.debug('Failed to fetch customer profile:', error.message);
                 });
             }
         }

@@ -67,6 +67,21 @@ class TransactionDTO {
   String get getToAccount => toAccountNumber ?? toAccount ?? '';
   String get getDescription => description ?? narration ?? 'Transfer';
   String get getDate => createdAt ?? date ?? '';
+  String get normalizedStatus {
+    final value = status.trim().toUpperCase();
+    if (value == 'COMPLETED') {
+      return 'SUCCESS';
+    }
+    if (value == 'INITIATED' ||
+        value == 'PENDING' ||
+        value == 'SUCCESS' ||
+        value == 'FAILED' ||
+        value == 'REVERSED') {
+      return value;
+    }
+    return 'SUCCESS';
+  }
+
   String get getSenderName {
     final value = senderName?.trim();
     if (value != null && value.isNotEmpty) {

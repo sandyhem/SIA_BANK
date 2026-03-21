@@ -79,6 +79,17 @@ class MetricsCollector:
         """Generate Prometheus-formatted metrics"""
         with self.lock:
             lines = []
+
+            # Build a stable service set so all core metrics are always present.
+            services = set()
+            services.update(self.metrics["bytes_sent"].keys())
+            services.update(self.metrics["bytes_received"].keys())
+            services.update(self.metrics["handshakes"].keys())
+            services.update(self.metrics["connections"].keys())
+            services.update(self.metrics["tls_versions"].keys())
+            services.update(self.metrics["cipher_suites"].keys())
+            services.update(self.metrics["anomalies"].keys())
+            services.update(self.metrics["handshake_durations"].keys())
             
             # Bytes sent
             lines.append("# HELP ssl_traffic_bytes_sent_total Total bytes sent over SSL/TLS per service")
@@ -95,28 +106,38 @@ class MetricsCollector:
             # Handshakes
             lines.append("# HELP ssl_handshakes_total Total TLS handshakes per service")
             lines.append("# TYPE ssl_handshakes_total counter")
-            for service, value in self.metrics["handshakes"].items():
+            for service in services:
+                value = self.metrics["handshakes"].get(service, 0)
                 lines.append(f'ssl_handshakes_total{{service="{service}"}} {value}')
             
             # Active connections
             lines.append("# HELP ssl_connections_active Active SSL connections per service")
             lines.append("# TYPE ssl_connections_active gauge")
-            for service, value in self.metrics["connections"].items():
+            for service in services:
+                value = self.metrics["connections"].get(service, 0)
                 lines.append(f'ssl_connections_active{{service="{service}"}} {value}')
             
             # TLS versions
             lines.append("# HELP ssl_tls_version_info TLS version usage per service")
             lines.append("# TYPE ssl_tls_version_info counter")
-            for service, versions in self.metrics["tls_versions"].items():
-                for version, count in versions.items():
-                    lines.append(f'ssl_tls_version_info{{service="{service}",version="{version}"}} {count}')
+            for service in services:
+                versions = self.metrics["tls_versions"].get(service, {})
+                if versions:
+                    for version, count in versions.items():
+                        lines.append(f'ssl_tls_version_info{{service="{service}",version="{version}"}} {count}')
+                else:
+                    lines.append(f'ssl_tls_version_info{{service="{service}",version="unknown"}} 0')
             
             # Cipher suites
             lines.append("# HELP ssl_cipher_suite_info Cipher suite usage per service")
             lines.append("# TYPE ssl_cipher_suite_info counter")
-            for service, suites in self.metrics["cipher_suites"].items():
-                for suite, count in suites.items():
-                    lines.append(f'ssl_cipher_suite_info{{service="{service}",cipher="{suite}"}} {count}')
+            for service in services:
+                suites = self.metrics["cipher_suites"].get(service, {})
+                if suites:
+                    for suite, count in suites.items():
+                        lines.append(f'ssl_cipher_suite_info{{service="{service}",cipher="{suite}"}} {count}')
+                else:
+                    lines.append(f'ssl_cipher_suite_info{{service="{service}",cipher="unknown"}} 0')
             
             # Anomalies
             lines.append("# HELP ssl_anomalies_total Total anomaly detections per type and service")
@@ -128,7 +149,8 @@ class MetricsCollector:
             # Handshake duration percentiles
             lines.append("# HELP ssl_handshake_duration_seconds TLS handshake duration in seconds")
             lines.append("# TYPE ssl_handshake_duration_seconds summary")
-            for service, durations in self.metrics["handshake_durations"].items():
+            for service in services:
+                durations = self.metrics["handshake_durations"].get(service, [])
                 if durations:
                     sorted_durations = sorted(durations)
                     p50 = sorted_durations[len(sorted_durations) // 2]
@@ -140,6 +162,12 @@ class MetricsCollector:
                     lines.append(f'ssl_handshake_duration_seconds{{service="{service}",quantile="0.99"}} {p99:.6f}')
                     lines.append(f'ssl_handshake_duration_seconds_sum{{service="{service}"}} {sum(durations):.6f}')
                     lines.append(f'ssl_handshake_duration_seconds_count{{service="{service}"}} {len(durations)}')
+                else:
+                    lines.append(f'ssl_handshake_duration_seconds{{service="{service}",quantile="0.5"}} 0')
+                    lines.append(f'ssl_handshake_duration_seconds{{service="{service}",quantile="0.9"}} 0')
+                    lines.append(f'ssl_handshake_duration_seconds{{service="{service}",quantile="0.99"}} 0')
+                    lines.append(f'ssl_handshake_duration_seconds_sum{{service="{service}"}} 0')
+                    lines.append(f'ssl_handshake_duration_seconds_count{{service="{service}"}} 0')
             
             # Exporter metadata
             lines.append("# HELP ssl_exporter_last_update_timestamp_seconds Last update time")
@@ -183,8 +211,8 @@ def tail_jsonl_file(filepath, collector):
     print(f"Tailing log file: {filepath}")
     
     with open(filepath, "r") as f:
-        # Seek to end of file
-        f.seek(0, 2)
+        # Seek to beginning of file to process all existing events first
+        f.seek(0, 0)
         
         while True:
             line = f.readline()

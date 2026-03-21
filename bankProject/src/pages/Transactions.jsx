@@ -142,6 +142,50 @@ export default function Transactions() {
     });
   };
 
+  const escapeCsvField = (value) => {
+    const raw = value ?? '';
+    const text = String(raw).replace(/"/g, '""');
+    return `"${text}"`;
+  };
+
+  const downloadTransactionsCsv = () => {
+    const headers = [
+      'transactionId',
+      'description',
+      'fromAccountNumber',
+      'toAccountNumber',
+      'amount',
+      'status',
+      'createdAt'
+    ];
+
+    const rows = filteredTransactions.map((txn) => [
+      txn.transactionId || '',
+      txn.description || 'Transfer',
+      txn.fromAccountNumber || '',
+      txn.toAccountNumber || '',
+      txn.amount || 0,
+      txn.status || 'PENDING',
+      txn.createdAt || ''
+    ]);
+
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => row.map((field) => escapeCsvField(field)).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.setAttribute('download', `transactions-${selectedAccount || 'account'}-${stamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (!isCustomerActive) {
     return (
       <QuantumLayout title="Transactions" subtitle="View transaction history">
@@ -184,6 +228,20 @@ export default function Transactions() {
         {/* Filters and Search */}
         {selectedAccount && !loading && (
           <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                Filters
+              </h3>
+              <button
+                onClick={downloadTransactionsCsv}
+                disabled={filteredTransactions.length === 0}
+                className="px-3 py-2 text-sm bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download CSV
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Search */}
               <div>

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/app_providers.dart';
 import '../../data/models/account_models.dart';
@@ -168,6 +169,18 @@ class HomeScreen extends ConsumerWidget {
         isAdmin ? null : ref.watch(currentCustomerProvider);
     final currentUserId = userIdAsyncValue.requireValue;
     final usernameAsync = ref.watch(currentUsernameProvider);
+    final lastUpdated = ref.watch(dashboardLastUpdatedProvider);
+
+    Future<void> refreshDashboard() async {
+      ref.invalidate(currentCustomerProvider);
+      ref.invalidate(accountsProvider);
+      ref.invalidate(userKycProvider);
+      final selected = ref.read(selectedAccountProvider);
+      if (selected != null) {
+        ref.invalidate(transactionHistoryProvider(selected.accountNumber));
+      }
+      ref.read(dashboardLastUpdatedProvider.notifier).state = DateTime.now();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -206,153 +219,166 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Padding(
-              padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 24.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isAdmin ? 'Admin Dashboard' : 'Welcome back,',
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      color: AppTheme.textLight,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  usernameAsync.when(
-                    data: (username) => Text(
-                      username ?? 'SIA Bank',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    loading: () => Text(
-                      'SIA Bank',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    error: (_, __) => Text(
-                      'SIA Bank',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  SizedBox(height: 6.h),
-                  Row(
-                    children: [
-                      Icon(Icons.shield_outlined,
-                          size: 14.sp, color: AppTheme.accentColor),
-                      SizedBox(width: 6.w),
-                      Text(
-                        'Secure Session Active',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: AppTheme.textLight,
-                          fontWeight: FontWeight.w500,
-                        ),
+      body: RefreshIndicator(
+        onRefresh: refreshDashboard,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 24.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAdmin ? 'Admin Dashboard' : 'Welcome back,',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: AppTheme.textLight,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    SizedBox(height: 4.h),
+                    usernameAsync.when(
+                      data: (username) => Text(
+                        username ?? 'SIA Bank',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      loading: () => Text(
+                        'SIA Bank',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      error: (_, __) => Text(
+                        'SIA Bank',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    SizedBox(height: 6.h),
+                    Row(
+                      children: [
+                        Icon(Icons.shield_outlined,
+                            size: 14.sp, color: AppTheme.accentColor),
+                        SizedBox(width: 6.w),
+                        Text(
+                          'Secure Session Active',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: AppTheme.textLight,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      'Last updated: ${DateFormat('dd MMM, hh:mm a').format(lastUpdated)}',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: AppTheme.textLight,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            if (!isAdmin)
-              customerAsyncValue!.when(
-                data: (customer) {
-                  if (customer == null) {
-                    return _buildCreateAccountPrompt(
-                      context,
-                      userId: currentUserId,
-                      username: usernameAsync.valueOrNull,
+              if (!isAdmin)
+                customerAsyncValue!.when(
+                  data: (customer) {
+                    if (customer == null) {
+                      return _buildCreateAccountPrompt(
+                        context,
+                        userId: currentUserId,
+                        username: usernameAsync.valueOrNull,
+                      );
+                    }
+                    return accountsAsyncValue!.when(
+                      data: (accounts) {
+                        if (accounts.isEmpty) {
+                          return _buildNoAccountsPrompt(
+                            context,
+                            userId: currentUserId,
+                          );
+                        }
+                        return _buildAccountsSection(context, ref, accounts);
+                      },
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (error, stack) =>
+                          Center(child: Text('Error: $error')),
                     );
-                  }
-                  return accountsAsyncValue!.when(
-                    data: (accounts) {
-                      if (accounts.isEmpty) {
-                        return _buildNoAccountsPrompt(
-                          context,
-                          userId: currentUserId,
-                        );
-                      }
-                      return _buildAccountsSection(context, ref, accounts);
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (error, stack) =>
-                        Center(child: Text('Error: $error')),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, stack) =>
-                    Center(child: Text('Error loading profile: $error')),
-              ),
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) =>
+                      Center(child: Text('Error loading profile: $error')),
+                ),
 
-            SizedBox(height: 16.h),
+              SizedBox(height: 16.h),
 
-            // KYC Status (admin users are exempt from KYC gating)
-            isAdmin
-                ? _buildAdminBanner(context)
-                : customerAsyncValue!.valueOrNull == null
-                    ? _buildPendingProfileBanner(context)
-                    : kycAsyncValue!.when(
-                        data: (kyc) => _buildKycStatusBanner(context, kyc),
-                        loading: () => const SizedBox.shrink(),
-                        error: (error, stack) => Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: Text(
-                            'Unable to fetch KYC status: $error',
-                            style: TextStyle(
-                              color: AppTheme.dangerColor,
-                              fontSize: 12.sp,
+              // KYC Status (admin users are exempt from KYC gating)
+              isAdmin
+                  ? _buildAdminBanner(context)
+                  : customerAsyncValue!.valueOrNull == null
+                      ? _buildPendingProfileBanner(context)
+                      : kycAsyncValue!.when(
+                          data: (kyc) => _buildKycStatusBanner(context, kyc),
+                          loading: () => const SizedBox.shrink(),
+                          error: (error, stack) => Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24.w),
+                            child: Text(
+                              'Unable to fetch KYC status: $error',
+                              style: TextStyle(
+                                color: AppTheme.dangerColor,
+                                fontSize: 12.sp,
+                              ),
                             ),
                           ),
                         ),
-                      ),
 
-            SizedBox(height: 32.h),
+              SizedBox(height: 32.h),
 
-            // Quick Actions
-            _buildQuickActions(context, ref, isAdmin: isAdmin),
+              // Quick Actions
+              _buildQuickActions(context, ref, isAdmin: isAdmin),
 
-            SizedBox(height: 32.h),
+              SizedBox(height: 32.h),
 
-            if (isAdmin) _buildAdminOperations(context),
+              if (isAdmin) _buildAdminOperations(context),
 
-            if (isAdmin) SizedBox(height: 32.h),
+              if (isAdmin) SizedBox(height: 32.h),
 
-            if (!isAdmin)
-              // Recent Transactions
-              accountsAsyncValue!.when(
-                data: (accounts) {
-                  if (customerAsyncValue!.valueOrNull == null) {
+              if (!isAdmin)
+                // Recent Transactions
+                accountsAsyncValue!.when(
+                  data: (accounts) {
+                    if (customerAsyncValue!.valueOrNull == null) {
+                      return const SizedBox.shrink();
+                    }
+                    if (accounts.isNotEmpty) {
+                      final selectedAccount =
+                          ref.watch(selectedAccountProvider) ?? accounts.first;
+                      return _buildRecentTransactions(
+                          context, ref, selectedAccount);
+                    }
                     return const SizedBox.shrink();
-                  }
-                  if (accounts.isNotEmpty) {
-                    final selectedAccount =
-                        ref.watch(selectedAccountProvider) ?? accounts.first;
-                    return _buildRecentTransactions(
-                        context, ref, selectedAccount);
-                  }
-                  return const SizedBox.shrink();
-                },
-                loading: () => const CircularProgressIndicator(),
-                error: (e, _) => const SizedBox.shrink(),
-              ),
+                  },
+                  loading: () => const CircularProgressIndicator(),
+                  error: (e, _) => const SizedBox.shrink(),
+                ),
 
-            SizedBox(height: 32.h),
-          ],
+              SizedBox(height: 32.h),
+            ],
+          ),
         ),
       ),
     );
@@ -373,17 +399,15 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         SizedBox(height: 16.h),
-        SizedBox(
-          height: 238.h,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 24.w),
-            itemCount: accounts.length,
-            itemBuilder: (context, index) {
-              final account = accounts[index];
-              return _buildAccountCard(context, ref, account, index);
-            },
-          ),
+        _AccountsCarousel(
+          accounts: accounts,
+          itemBuilder: (context, account, index) =>
+              _buildAccountCard(context, ref, account, index),
+          onAccountChanged: (account) {
+            Future<void>(() {
+              ref.read(selectedAccountProvider.notifier).state = account;
+            });
+          },
         ),
       ],
     );
@@ -401,6 +425,15 @@ class HomeScreen extends ConsumerWidget {
     final colorPair = colors[index % colors.length];
     final visibilityMap = ref.watch(balanceVisibilityProvider);
     final isBalanceVisible = visibilityMap[account.accountNumber] ?? false;
+    final controls = ref.watch(accountControlProvider);
+    final control = controls[account.accountNumber] ??
+        const AccountControlState(
+          nickname: '',
+          isFrozen: false,
+          dailyLimit: 1000000,
+        );
+    final displayName =
+        control.nickname.trim().isEmpty ? account.type : control.nickname;
 
     return Container(
       width: 300.w,
@@ -441,7 +474,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    'Savings',
+                    displayName,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 13.sp,
@@ -450,17 +483,66 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              Container(
-                width: 40.w,
-                height: 40.w,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10.r),
-                ),
-                child: const Center(
-                  child:
-                      Icon(Icons.account_balance_wallet, color: Colors.white),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PopupMenuButton<String>(
+                    tooltip: 'Account settings',
+                    onSelected: (value) async {
+                      if (value == 'freeze_toggle') {
+                        final updated =
+                            Map<String, AccountControlState>.from(controls);
+                        updated[account.accountNumber] =
+                            control.copyWith(isFrozen: !control.isFrozen);
+                        ref.read(accountControlProvider.notifier).state =
+                            updated;
+                        return;
+                      }
+                      if (value == 'nickname') {
+                        await _editAccountNickname(
+                            context, ref, account, control);
+                        return;
+                      }
+                      if (value == 'limit') {
+                        await _editAccountLimit(context, ref, account, control);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem<String>(
+                        value: 'freeze_toggle',
+                        child: Text(control.isFrozen
+                            ? 'Unfreeze Account'
+                            : 'Freeze Account'),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'nickname',
+                        child: Text('Edit Nickname'),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'limit',
+                        child: Text('Set Daily Limit'),
+                      ),
+                    ],
+                    icon: Icon(Icons.more_horiz,
+                        color: Colors.white, size: 18.sp),
+                  ),
+                  Container(
+                    width: 40.w,
+                    height: 40.w,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        control.isFrozen
+                            ? Icons.lock
+                            : Icons.account_balance_wallet,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -586,6 +668,109 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _editAccountNickname(
+    BuildContext context,
+    WidgetRef ref,
+    AccountDTO account,
+    AccountControlState current,
+  ) async {
+    final controller = TextEditingController(text: current.nickname);
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Account Nickname'),
+          content: TextField(
+            controller: controller,
+            maxLength: 24,
+            decoration: const InputDecoration(
+              hintText: 'e.g. Salary, Emergency Fund',
+              counterText: '',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldSave != true) {
+      return;
+    }
+
+    final updated =
+        Map<String, AccountControlState>.from(ref.read(accountControlProvider));
+    updated[account.accountNumber] = current.copyWith(
+      nickname: controller.text.trim(),
+    );
+    ref.read(accountControlProvider.notifier).state = updated;
+  }
+
+  Future<void> _editAccountLimit(
+    BuildContext context,
+    WidgetRef ref,
+    AccountDTO account,
+    AccountControlState current,
+  ) async {
+    final controller = TextEditingController(
+      text: current.dailyLimit.toStringAsFixed(0),
+    );
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Daily Limit'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              prefixText: '₹ ',
+              hintText: 'Enter daily transfer limit',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldSave != true) {
+      return;
+    }
+
+    final parsed = double.tryParse(controller.text.trim());
+    if (parsed == null || parsed <= 0) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid positive limit.')),
+      );
+      return;
+    }
+
+    final updated =
+        Map<String, AccountControlState>.from(ref.read(accountControlProvider));
+    updated[account.accountNumber] = current.copyWith(dailyLimit: parsed);
+    ref.read(accountControlProvider.notifier).state = updated;
   }
 
   Future<bool> _promptAndVerifyMpin(BuildContext context, WidgetRef ref) async {
@@ -767,6 +952,34 @@ class HomeScreen extends ConsumerWidget {
                     builder: (_) => const AccountInsightsScreen(),
                   ),
                 );
+              },
+            ),
+            _buildActionButton(
+              context,
+              'Open Account',
+              Icons.add_card,
+              columns: columns,
+              onTap: () {
+                final userId = ref.read(currentUserIdProvider).valueOrNull;
+                if (userId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('User session missing. Please login again.'),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.of(context)
+                    .push(
+                  MaterialPageRoute(
+                    builder: (_) => OpenAccountScreen(userId: userId),
+                  ),
+                )
+                    .then((_) {
+                  ref.invalidate(accountsProvider);
+                });
               },
             ),
           ];
@@ -1104,34 +1317,64 @@ class HomeScreen extends ConsumerWidget {
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 24.w),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Recent Transactions',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TransactionHistoryScreen(
-                        initialAccountNumber: account.accountNumber,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent Transactions',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => TransactionHistoryScreen(
+                            initialAccountNumber: account.accountNumber,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'See All',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  );
-                },
-                child: Text(
-                  'See All',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
+                ],
+              ),
+              SizedBox(height: 8.h),
+              Wrap(
+                spacing: 8.w,
+                runSpacing: 6.h,
+                children: [
+                  _buildTxnLegendChip(
+                    icon: Icons.check_circle,
+                    label: 'Success',
+                    bgColor: const Color(0xFFE6F7EF),
+                    fgColor: const Color(0xFF0E8A58),
+                  ),
+                  _buildTxnLegendChip(
+                    icon: Icons.schedule,
+                    label: 'Pending',
+                    bgColor: const Color(0xFFFFF6DF),
+                    fgColor: const Color(0xFFB7791F),
+                  ),
+                  _buildTxnLegendChip(
+                    icon: Icons.error,
+                    label: 'Failed',
+                    bgColor: const Color(0xFFFFECEC),
+                    fgColor: const Color(0xFFCC4A4A),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1158,7 +1401,11 @@ class HomeScreen extends ConsumerWidget {
               itemCount: transactions.take(5).length,
               itemBuilder: (context, index) {
                 final txn = transactions[index];
-                return _buildTransactionTile(context, txn);
+                return _buildTransactionTile(
+                  context,
+                  txn,
+                  account.accountNumber,
+                );
               },
             );
           },
@@ -1170,78 +1417,212 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildTransactionTile(
-      BuildContext context, TransactionDTO transaction) {
-    final isDebit =
-        transaction.type == 'TRANSFER' || transaction.type == 'WITHDRAWAL';
+    BuildContext context,
+    TransactionDTO transaction,
+    String activeAccountNumber,
+  ) {
+    final fromAccount = transaction.getFromAccount.trim();
+    final toAccount = transaction.getToAccount.trim();
+
+    final isDebit = fromAccount.isNotEmpty
+        ? fromAccount == activeAccountNumber
+        : (toAccount.isNotEmpty ? false : transaction.type == 'WITHDRAWAL');
+
     final icon = isDebit ? Icons.arrow_upward : Icons.arrow_downward;
-    final color = isDebit ? AppTheme.dangerColor : AppTheme.accentColor;
+    final color = isDebit ? const Color(0xFFE06273) : const Color(0xFF11A36A);
+    final status = transaction.status.toUpperCase();
+    final isSuccess = status == 'SUCCESS' || status == 'COMPLETED';
+    final statusBg = isSuccess
+        ? const Color(0xFFE6F7EF)
+        : (status == 'PENDING'
+            ? const Color(0xFFFFF6DF)
+            : const Color(0xFFFFECEC));
+    final statusFg = isSuccess
+        ? const Color(0xFF0E8A58)
+        : (status == 'PENDING'
+            ? const Color(0xFFB7791F)
+            : const Color(0xFFCC4A4A));
+    final statusIcon = isSuccess
+        ? Icons.check_circle_rounded
+        : (status == 'PENDING' ? Icons.schedule_rounded : Icons.error_rounded);
+    final dateLabel = _formatFriendlyTxnDate(transaction.getDate);
 
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h),
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12.r),
+            hoverColor: AppTheme.primaryColor.withValues(alpha: 0.04),
+            splashColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+            onTap: () {
+              HapticFeedback.selectionClick();
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 4.h),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48.w,
+                    height: 48.w,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Center(
+                      child: Icon(icon, color: color, size: 20.sp),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          transaction.narration ?? transaction.type,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          dateLabel,
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: AppTheme.textLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${isDebit ? '-' : '+'}₹ ${transaction.amount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 8.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              statusIcon,
+                              size: 11.sp,
+                              color: statusFg,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              status,
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                color: statusFg,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatFriendlyTxnDate(String rawDate) {
+    final text = rawDate.trim();
+    if (text.isEmpty) {
+      return 'Date unavailable';
+    }
+
+    DateTime? dt;
+    try {
+      dt = DateTime.parse(text).toLocal();
+    } catch (_) {
+      return 'Date unavailable';
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final txnDay = DateTime(dt.year, dt.month, dt.day);
+    final diff = today.difference(txnDay).inDays;
+
+    final hh = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hh:$mm $ampm';
+
+    if (diff == 0) {
+      return 'Today, $time';
+    }
+    if (diff == 1) {
+      return 'Yesterday, $time';
+    }
+
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final month = months[dt.month - 1];
+    return '${dt.day} $month, $time';
+  }
+
+  Widget _buildTxnLegendChip({
+    required IconData icon,
+    required String label,
+    required Color bgColor,
+    required Color fgColor,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8.r),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 48.w,
-            height: 48.w,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12.r),
+          Icon(icon, size: 11.sp, color: fgColor),
+          SizedBox(width: 4.w),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.sp,
+              color: fgColor,
+              fontWeight: FontWeight.w600,
             ),
-            child: Center(
-              child: Icon(icon, color: color, size: 20.sp),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.narration ?? transaction.type,
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  transaction.date ?? 'Unknown date',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppTheme.textLight,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${isDebit ? '-' : '+'}₹ ${transaction.amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4.r),
-                ),
-                child: Text(
-                  transaction.status,
-                  style: TextStyle(
-                    fontSize: 10.sp,
-                    color: color,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -1386,6 +1767,126 @@ class _SessionRecoveryRedirect extends ConsumerStatefulWidget {
   @override
   ConsumerState<_SessionRecoveryRedirect> createState() =>
       _SessionRecoveryRedirectState();
+}
+
+class _AccountsCarousel extends StatefulWidget {
+  final List<AccountDTO> accounts;
+  final Widget Function(BuildContext, AccountDTO, int) itemBuilder;
+  final ValueChanged<AccountDTO> onAccountChanged;
+
+  const _AccountsCarousel({
+    required this.accounts,
+    required this.itemBuilder,
+    required this.onAccountChanged,
+  });
+
+  @override
+  State<_AccountsCarousel> createState() => _AccountsCarouselState();
+}
+
+class _AccountsCarouselState extends State<_AccountsCarousel> {
+  late final PageController _controller;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(viewportFraction: 0.88);
+    if (widget.accounts.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || widget.accounts.isEmpty) {
+          return;
+        }
+        widget.onAccountChanged(widget.accounts.first);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _jumpTo(int next) {
+    if (next < 0 || next >= widget.accounts.length) {
+      return;
+    }
+    _controller.animateToPage(
+      next,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 238.h,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.accounts.length,
+            onPageChanged: (idx) {
+              setState(() => _index = idx);
+              widget.onAccountChanged(widget.accounts[idx]);
+            },
+            itemBuilder: (context, idx) => Padding(
+              padding: EdgeInsets.only(left: idx == 0 ? 24.w : 0, right: 8.w),
+              child: widget.itemBuilder(context, widget.accounts[idx], idx),
+            ),
+          ),
+        ),
+        SizedBox(height: 10.h),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Row(
+            children: [
+              Semantics(
+                button: true,
+                label: 'Previous account',
+                child: IconButton(
+                  onPressed: _index == 0 ? null : () => _jumpTo(_index - 1),
+                  icon: const Icon(Icons.chevron_left),
+                ),
+              ),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    widget.accounts.length,
+                    (dot) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      margin: EdgeInsets.symmetric(horizontal: 3.w),
+                      width: _index == dot ? 18.w : 6.w,
+                      height: 6.h,
+                      decoration: BoxDecoration(
+                        color: _index == dot
+                            ? AppTheme.primaryColor
+                            : AppTheme.borderColor,
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: 'Next account',
+                child: IconButton(
+                  onPressed: _index >= widget.accounts.length - 1
+                      ? null
+                      : () => _jumpTo(_index + 1),
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _SessionRecoveryRedirectState

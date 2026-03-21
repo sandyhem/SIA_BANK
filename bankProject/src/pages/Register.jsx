@@ -39,7 +39,14 @@ export default function Register() {
             await register(userData);
             navigate('/');
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed. Please try again.');
+            const backendMessage = err?.response?.data?.message;
+            if (backendMessage) {
+                setError(backendMessage);
+            } else if (!err?.response) {
+                setError('Unable to reach auth service. Check backend TLS mode/URL and certificate trust.');
+            } else {
+                setError('Registration failed. Please try again.');
+            }
         } finally {
             setLoading(false);
         }

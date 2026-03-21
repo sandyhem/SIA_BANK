@@ -8,6 +8,7 @@ echo "Starting services with KYC verification enabled..."
 echo ""
 
 TLS_MODE="${TLS_MODE:-nginx-proxy}"
+
 TLS_ENV_FILE="${TLS_ENV_FILE:-/home/inba/SIA_BANK/tls-config/${TLS_MODE}.env}"
 
 if [ -f "$TLS_ENV_FILE" ]; then
@@ -31,6 +32,11 @@ auth_scheme="http"
 account_scheme="http"
 transaction_scheme="http"
 
+proxy_public_scheme="http"
+proxy_public_host="localhost"
+proxy_public_port="443"
+proxy_public_base=""
+
 if [ "${AUTH_SERVICE_TLS_ENABLED:-false}" = "true" ]; then
     auth_scheme="https"
 fi
@@ -41,12 +47,57 @@ if [ "${TRANSACTION_SERVICE_TLS_ENABLED:-false}" = "true" ]; then
     transaction_scheme="https"
 fi
 
+if [ "${PQ_NGINX_SSL_ENABLED:-true}" = "true" ]; then
+    proxy_public_scheme="https"
+fi
+proxy_public_host="${PQ_NGINX_HOST:-localhost}"
+proxy_public_port="${PQ_NGINX_PORT:-443}"
+
+if [ "$proxy_public_port" = "443" ] && [ "$proxy_public_scheme" = "https" ]; then
+    proxy_public_base="${proxy_public_scheme}://${proxy_public_host}"
+else
+    proxy_public_base="${proxy_public_scheme}://${proxy_public_host}:${proxy_public_port}"
+fi
+
 # Function to check if port is in use
 check_port() {
     if lsof -Pi :$1 -sTCP:LISTEN -t >/dev/null ; then
         return 0
     else
         return 1
+    fi
+}
+
+run_pq_nginx() {
+    if [ "${TLS_MODE}" != "nginx-proxy" ] || [ "${PQ_NGINX_ENABLED:-true}" != "true" ]; then
+        return 0
+    fi
+
+    local configure_script="/home/inba/SIA_BANK/docs_and_scripts/configure-pq-nginx.sh"
+
+    if [ ! -x "$configure_script" ]; then
+        echo -e "${RED}Missing executable: $configure_script${NC}"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}[proxy]${NC} Configuring PQ NGINX reverse proxy..."
+    if [ "${PQ_NGINX_USE_SUDO:-true}" = "true" ]; then
+        if ! sudo -E "$configure_script" --apply; then
+            echo -e "${RED}Failed to configure/start PQ NGINX proxy${NC}"
+            exit 1
+        fi
+    else
+        if ! "$configure_script" --apply; then
+            echo -e "${RED}Failed to configure/start PQ NGINX proxy${NC}"
+            exit 1
+        fi
+    fi
+
+    if wait_for_service "${proxy_public_base}/healthz" "PQ NGINX Proxy"; then
+        echo -e "${GREEN}PQ NGINX proxy ready at ${proxy_public_base}${NC}"
+    else
+        echo -e "${RED}PQ NGINX proxy did not become healthy${NC}"
+        exit 1
     fi
 }
 
@@ -119,6 +170,9 @@ echo "Transaction Service PID: $TRANSACTION_PID"
 sleep 10
 echo -e "${GREEN}Transaction Service started successfully on port 8082${NC}"
 
+# Start/reload PQ NGINX proxy in nginx-proxy mode
+run_pq_nginx
+
 echo ""
 echo -e "${GREEN}=== All Services Started Successfully ===${NC}"
 echo ""
@@ -127,6 +181,12 @@ echo "  ✓ Auth Service:        ${auth_scheme}://localhost:${AUTH_SERVER_PORT:-
 echo "  ✓ Account Service:     ${account_scheme}://localhost:${ACCOUNT_SERVER_PORT:-8081} (PID: $ACCOUNT_PID)"
 echo "  ✓ Transaction Service: ${transaction_scheme}://localhost:${TRANSACTION_SERVER_PORT:-8082} (PID: $TRANSACTION_PID)"
 echo "Transport Mode: ${TLS_MODE}"
+if [ "${TLS_MODE}" = "nginx-proxy" ] && [ "${PQ_NGINX_ENABLED:-true}" = "true" ]; then
+    echo "  ✓ PQ NGINX Gateway:    ${proxy_public_base}"
+    echo "    - Auth API:          ${proxy_public_base}/auth/api"
+    echo "    - Account API:       ${proxy_public_base}/api/accounts"
+    echo "    - Transaction API:   ${proxy_public_base}/api/transactions"
+fi
 echo ""
 echo "Frontend: http://localhost:5174"
 echo ""

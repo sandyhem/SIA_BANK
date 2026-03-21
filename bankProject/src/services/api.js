@@ -1,9 +1,16 @@
 import axios from 'axios';
 
 // API Base URLs from environment variables
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8083/auth/api';
-const ACCOUNT_API_URL = import.meta.env.VITE_ACCOUNT_API_URL || 'http://localhost:8081/api';
-const TRANSACTION_API_URL = import.meta.env.VITE_TRANSACTION_API_URL || 'http://localhost:8082/api';
+const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL;
+const AUTH_API_URL =
+    import.meta.env.VITE_AUTH_API_URL ||
+    (API_GATEWAY_URL ? `${API_GATEWAY_URL}/auth/api` : 'https://localhost:8083/auth/api');
+const ACCOUNT_API_URL =
+    import.meta.env.VITE_ACCOUNT_API_URL ||
+    (API_GATEWAY_URL ? `${API_GATEWAY_URL}/api` : 'https://localhost:8081/api');
+const TRANSACTION_API_URL =
+    import.meta.env.VITE_TRANSACTION_API_URL ||
+    (API_GATEWAY_URL ? `${API_GATEWAY_URL}/api` : 'https://localhost:8082/api');
 
 // Create axios instances for each service
 const authApi = axios.create({
@@ -52,9 +59,14 @@ const addErrorInterceptor = (apiInstance) => {
         (error) => {
             if (error.response?.status === 401) {
                 // Unauthorized - clear token and redirect to login
+                // But only if we're not already on the login/register page
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('userProfile');
-                window.location.href = '/login';
+
+                const currentPath = window.location.pathname;
+                if (currentPath !== '/login' && currentPath !== '/register') {
+                    window.location.href = '/login';
+                }
             }
             return Promise.reject(error);
         }

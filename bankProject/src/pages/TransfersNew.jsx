@@ -17,12 +17,21 @@ export default function Transfers() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [recentBeneficiaries, setRecentBeneficiaries] = useState([]);
 
     useEffect(() => {
         if (isCustomerActive && user?.id) {
             loadAccounts();
         }
     }, [isCustomerActive, user]);
+
+    useEffect(() => {
+        if (formData.fromAccount) {
+            loadRecentBeneficiaries(formData.fromAccount);
+        } else {
+            setRecentBeneficiaries([]);
+        }
+    }, [formData.fromAccount]);
 
     const loadAccounts = async () => {
         try {
@@ -34,6 +43,38 @@ export default function Transfers() {
             }
         } catch (err) {
             console.error('Error loading accounts:', err);
+        }
+    };
+
+    const loadRecentBeneficiaries = async (accountNumber) => {
+        try {
+            const txns = await transactionService.getTransactionsByAccount(accountNumber);
+            const outgoing = (txns || []).filter(
+                (txn) =>
+                    txn.fromAccountNumber === accountNumber &&
+                    txn.toAccountNumber &&
+                    txn.toAccountNumber !== accountNumber
+            );
+
+            const seen = new Set();
+            const recent = [];
+
+            for (const txn of outgoing) {
+                if (!seen.has(txn.toAccountNumber)) {
+                    seen.add(txn.toAccountNumber);
+                    recent.push({
+                        accountNumber: txn.toAccountNumber,
+                        lastAmount: txn.amount,
+                        lastDescription: txn.description || 'Fund Transfer'
+                    });
+                }
+                if (recent.length >= 5) break;
+            }
+
+            setRecentBeneficiaries(recent);
+        } catch (err) {
+            console.error('Error loading recent beneficiaries:', err);
+            setRecentBeneficiaries([]);
         }
     };
 
@@ -137,6 +178,30 @@ export default function Transfers() {
                                 required
                             />
                             <p className="text-sm text-gray-500 mt-1">Enter the 10-digit account number</p>
+                            {recentBeneficiaries.length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-xs font-semibold text-gray-600 mb-2">Recent Beneficiaries</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {recentBeneficiaries.map((beneficiary) => (
+                                            <button
+                                                type="button"
+                                                key={beneficiary.accountNumber}
+                                                onClick={() =>
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        toAccount: beneficiary.accountNumber,
+                                                        description: prev.description || beneficiary.lastDescription
+                                                    }))
+                                                }
+                                                className="px-3 py-1.5 text-xs rounded-full border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100"
+                                                title={`Last transfer: Rs ${parseFloat(beneficiary.lastAmount || 0).toLocaleString('en-IN')}`}
+                                            >
+                                                {beneficiary.accountNumber}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div>

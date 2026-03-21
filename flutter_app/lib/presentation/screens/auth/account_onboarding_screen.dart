@@ -11,11 +11,29 @@ import '../../../data/models/auth_models.dart';
 class AccountOnboardingScreen extends ConsumerStatefulWidget {
   final int userId;
   final String fullName;
+  final String? phoneNumber;
+  final String? address;
+  final String? city;
+  final String? state;
+  final String? postalCode;
+  final String? country;
+  final String? dateOfBirth;
+  final String? panNumber;
+  final String? aadhaarNumber;
 
   const AccountOnboardingScreen({
     Key? key,
     required this.userId,
     this.fullName = '',
+    this.phoneNumber,
+    this.address,
+    this.city,
+    this.state,
+    this.postalCode,
+    this.country,
+    this.dateOfBirth,
+    this.panNumber,
+    this.aadhaarNumber,
   }) : super(key: key);
 
   @override
@@ -31,22 +49,38 @@ class _AccountOnboardingScreenState
   late TextEditingController _dobController;
   late TextEditingController _panController;
   late TextEditingController _aadhaarController;
+  late TextEditingController _cityController;
+  late TextEditingController _stateController;
+  late TextEditingController _postalCodeController;
+  late TextEditingController _countryController;
   late TextEditingController _accountNameController;
   late TextEditingController _initialBalanceController;
 
   bool _isSubmitting = false;
   String? _errorMessage;
   String _accountType = 'SAVINGS';
+  bool _idDocumentUploaded = false;
+  bool _selfieUploaded = false;
+  bool _kycSubmitted = false;
+  bool _kycRejected = false;
+  String _kycStatus = 'NOT_STARTED';
+  String? _rejectionReason;
 
   @override
   void initState() {
     super.initState();
     _fullNameController = TextEditingController(text: widget.fullName);
-    _phoneController = TextEditingController();
-    _addressController = TextEditingController();
-    _dobController = TextEditingController();
-    _panController = TextEditingController();
-    _aadhaarController = TextEditingController();
+    _phoneController = TextEditingController(text: widget.phoneNumber ?? '');
+    _addressController = TextEditingController(text: widget.address ?? '');
+    _dobController = TextEditingController(text: widget.dateOfBirth ?? '');
+    _panController = TextEditingController(text: widget.panNumber ?? '');
+    _aadhaarController =
+        TextEditingController(text: widget.aadhaarNumber ?? '');
+    _cityController = TextEditingController(text: widget.city ?? '');
+    _stateController = TextEditingController(text: widget.state ?? '');
+    _postalCodeController =
+        TextEditingController(text: widget.postalCode ?? '');
+    _countryController = TextEditingController(text: widget.country ?? 'India');
     _accountNameController = TextEditingController();
     _initialBalanceController = TextEditingController(text: '1000');
   }
@@ -59,6 +93,10 @@ class _AccountOnboardingScreenState
     _dobController.dispose();
     _panController.dispose();
     _aadhaarController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _postalCodeController.dispose();
+    _countryController.dispose();
     _accountNameController.dispose();
     _initialBalanceController.dispose();
     super.dispose();
@@ -128,6 +166,17 @@ class _AccountOnboardingScreenState
       return false;
     }
 
+    if (!_idDocumentUploaded) {
+      setState(() => _errorMessage = 'Upload ID document before continuing');
+      return false;
+    }
+
+    if (!_selfieUploaded) {
+      setState(
+          () => _errorMessage = 'Upload selfie verification before continuing');
+      return false;
+    }
+
     final initialBalance = double.tryParse(
         _initialBalanceController.text.trim() == ''
             ? '0'
@@ -194,6 +243,10 @@ class _AccountOnboardingScreenState
             fullName: _fullNameController.text.trim(),
             phoneNumber: _phoneController.text.trim(),
             address: _addressController.text.trim(),
+            city: _cityController.text.trim(),
+            state: _stateController.text.trim(),
+            postalCode: _postalCodeController.text.trim(),
+            country: _countryController.text.trim(),
             dateOfBirth: _dobController.text.trim(),
             panNumber: _panController.text.trim().toUpperCase(),
             aadhaarNumber: _aadhaarController.text.trim(),
@@ -217,7 +270,24 @@ class _AccountOnboardingScreenState
         );
 
         if (!mounted) return;
+        final simulatedRejected =
+            _panController.text.trim().toUpperCase().endsWith('Z');
+        if (simulatedRejected) {
+          setState(() {
+            _kycRejected = true;
+            _kycStatus = 'REJECTED';
+            _rejectionReason =
+                'PAN validation mismatch with uploaded document. Please re-upload clear KYC proof.';
+            _isSubmitting = false;
+          });
+          return;
+        }
+
         final accountStatus = createdAccount.status.toUpperCase();
+        setState(() {
+          _kycSubmitted = true;
+          _kycStatus = accountStatus == 'ACTIVE' ? 'VERIFIED' : 'PENDING';
+        });
         final message = accountStatus == 'ACTIVE'
             ? 'Account created successfully.'
             : 'Account created and sent for admin KYC verification. It will be activated after approval.';
@@ -254,6 +324,37 @@ class _AccountOnboardingScreenState
     }
   }
 
+  Widget _buildKycStepChip(String label, bool done) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20.r),
+        color: done
+            ? AppTheme.accentColor.withValues(alpha: 0.15)
+            : AppTheme.borderColor.withValues(alpha: 0.25),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            done ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 13.sp,
+            color: done ? AppTheme.accentColor : AppTheme.textLight,
+          ),
+          SizedBox(width: 6.w),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.sp,
+              color: done ? AppTheme.accentColor : AppTheme.textLight,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -266,6 +367,156 @@ class _AccountOnboardingScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: AppTheme.bgLight,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: AppTheme.borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'KYC Journey',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Wrap(
+                      spacing: 8.w,
+                      runSpacing: 6.h,
+                      children: [
+                        _buildKycStepChip(
+                          'Document Upload',
+                          _idDocumentUploaded,
+                        ),
+                        _buildKycStepChip(
+                          'Selfie Match',
+                          _selfieUploaded,
+                        ),
+                        _buildKycStepChip(
+                          'Submitted',
+                          _kycSubmitted,
+                        ),
+                        _buildKycStepChip(
+                          _kycStatus,
+                          _kycStatus == 'VERIFIED' || _kycStatus == 'PENDING',
+                        ),
+                      ],
+                    ),
+                    if (_kycRejected && _rejectionReason != null) ...[
+                      SizedBox(height: 10.h),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(10.w),
+                        decoration: BoxDecoration(
+                          color: AppTheme.dangerColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(
+                            color: AppTheme.dangerColor.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Rejection reason',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.dangerColor,
+                              ),
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              _rejectionReason!,
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(height: 14.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () {
+                              setState(() {
+                                _idDocumentUploaded = true;
+                                _kycStatus = 'INITIATED';
+                                _errorMessage = null;
+                              });
+                            },
+                      icon: Icon(
+                        _idDocumentUploaded
+                            ? Icons.check_circle
+                            : Icons.upload_file,
+                      ),
+                      label: Text(_idDocumentUploaded
+                          ? 'Document Uploaded'
+                          : 'Upload Document'),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () {
+                              setState(() {
+                                _selfieUploaded = true;
+                                _kycStatus = 'INITIATED';
+                                _errorMessage = null;
+                              });
+                            },
+                      icon: Icon(
+                        _selfieUploaded
+                            ? Icons.check_circle
+                            : Icons.camera_alt_outlined,
+                      ),
+                      label: Text(_selfieUploaded
+                          ? 'Selfie Verified'
+                          : 'Upload Selfie'),
+                    ),
+                  ),
+                ],
+              ),
+              if (_kycRejected) ...[
+                SizedBox(height: 10.h),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () {
+                            setState(() {
+                              _kycRejected = false;
+                              _kycSubmitted = false;
+                              _kycStatus = 'INITIATED';
+                              _rejectionReason = null;
+                              _idDocumentUploaded = false;
+                              _selfieUploaded = false;
+                            });
+                          },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry KYC'),
+                  ),
+                ),
+              ],
+              SizedBox(height: 16.h),
               Text(
                 'One-time setup for account opening',
                 style: Theme.of(context).textTheme.titleMedium,
@@ -296,8 +547,64 @@ class _AccountOnboardingScreenState
                 ),
               ),
               SizedBox(height: 12.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _cityController,
+                      decoration: const InputDecoration(
+                        labelText: 'City (optional)',
+                        prefixIcon: Icon(Icons.location_city_outlined),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Expanded(
+                    child: TextField(
+                      controller: _stateController,
+                      decoration: const InputDecoration(
+                        labelText: 'State (optional)',
+                        prefixIcon: Icon(Icons.map_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _postalCodeController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Postal Code (optional)',
+                        prefixIcon: Icon(Icons.markunread_mailbox_outlined),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Expanded(
+                    child: TextField(
+                      controller: _countryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Country (optional)',
+                        prefixIcon: Icon(Icons.public_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12.h),
               TextField(
                 controller: _dobController,
+                onChanged: (_) {
+                  if (_errorMessage != null &&
+                      (_errorMessage!.contains('Date of birth') ||
+                          _errorMessage!.contains('YYYY-MM-DD'))) {
+                    setState(() => _errorMessage = null);
+                  }
+                },
                 decoration: const InputDecoration(
                   labelText: 'Date Of Birth (YYYY-MM-DD)',
                   prefixIcon: Icon(Icons.cake_outlined),

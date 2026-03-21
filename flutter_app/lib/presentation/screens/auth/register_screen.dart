@@ -16,6 +16,15 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _dobController;
+  late TextEditingController _addressController;
+  late TextEditingController _cityController;
+  late TextEditingController _stateController;
+  late TextEditingController _postalCodeController;
+  late TextEditingController _countryController;
+  late TextEditingController _panController;
+  late TextEditingController _aadhaarController;
   late TextEditingController _emailController;
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
@@ -36,6 +45,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.initState();
     _firstNameController = TextEditingController();
     _lastNameController = TextEditingController();
+    _phoneController = TextEditingController();
+    _dobController = TextEditingController();
+    _addressController = TextEditingController();
+    _cityController = TextEditingController();
+    _stateController = TextEditingController();
+    _postalCodeController = TextEditingController();
+    _countryController = TextEditingController(text: 'India');
+    _panController = TextEditingController();
+    _aadhaarController = TextEditingController();
     _emailController = TextEditingController();
     _usernameController = TextEditingController();
     _passwordController = TextEditingController();
@@ -48,6 +66,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _postalCodeController.dispose();
+    _countryController.dispose();
+    _panController.dispose();
+    _aadhaarController.dispose();
     _emailController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -97,6 +124,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               userId: response.userId,
               fullName:
                   '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+              phoneNumber: _phoneController.text.trim(),
+              address: _addressController.text.trim(),
+              city: _cityController.text.trim(),
+              state: _stateController.text.trim(),
+              postalCode: _postalCodeController.text.trim(),
+              country: _countryController.text.trim(),
+              dateOfBirth: _dobController.text.trim(),
+              panNumber: _panController.text.trim().toUpperCase(),
+              aadhaarNumber: _aadhaarController.text.trim(),
             ),
           ),
         );
@@ -111,6 +147,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _validateInputs() {
     if (_firstNameController.text.trim().isEmpty ||
         _lastNameController.text.trim().isEmpty ||
+        _phoneController.text.trim().isEmpty ||
+        _dobController.text.trim().isEmpty ||
+        _addressController.text.trim().isEmpty ||
+        _panController.text.trim().isEmpty ||
+        _aadhaarController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty ||
         _usernameController.text.trim().isEmpty ||
         _passwordController.text.isEmpty ||
@@ -118,6 +159,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _mpinController.text.isEmpty ||
         _confirmMpinController.text.isEmpty) {
       setState(() => _errorMessage = 'Please fill in all fields');
+      return false;
+    }
+
+    if (!RegExp(r'^\d{10}$').hasMatch(_phoneController.text.trim())) {
+      setState(() => _errorMessage = 'Phone must be exactly 10 digits');
+      return false;
+    }
+
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(_dobController.text.trim())) {
+      setState(() => _errorMessage = 'Date of birth must be YYYY-MM-DD');
+      return false;
+    }
+
+    if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$')
+        .hasMatch(_panController.text.trim().toUpperCase())) {
+      setState(() => _errorMessage = 'PAN format should be like ABCDE1234F');
+      return false;
+    }
+
+    if (!RegExp(r'^\d{12}$').hasMatch(_aadhaarController.text.trim())) {
+      setState(() => _errorMessage = 'Aadhaar must be 12 digits');
+      return false;
+    }
+
+    final postal = _postalCodeController.text.trim();
+    if (postal.isNotEmpty && !RegExp(r'^\d{6}$').hasMatch(postal)) {
+      setState(() => _errorMessage = 'Postal code must be 6 digits');
       return false;
     }
 
@@ -255,6 +323,131 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   labelText: 'Email Address',
                   hintText: 'john@example.com',
                   prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              Text(
+                'Identity & Contact Details',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textDark,
+                ),
+              ),
+              SizedBox(height: 10.h),
+
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Number',
+                  hintText: '10-digit mobile number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              TextField(
+                controller: _dobController,
+                keyboardType: TextInputType.datetime,
+                onChanged: (_) {
+                  if (_errorMessage != null &&
+                      _errorMessage!.contains('Date of birth')) {
+                    setState(() => _errorMessage = null);
+                  }
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Date Of Birth',
+                  hintText: 'YYYY-MM-DD',
+                  prefixIcon: Icon(Icons.cake_outlined),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              TextField(
+                controller: _addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Address',
+                  hintText: 'House/Street/Area',
+                  prefixIcon: Icon(Icons.home_outlined),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _cityController,
+                      decoration: const InputDecoration(
+                        labelText: 'City',
+                        hintText: 'City',
+                        prefixIcon: Icon(Icons.location_city_outlined),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Expanded(
+                    child: TextField(
+                      controller: _stateController,
+                      decoration: const InputDecoration(
+                        labelText: 'State',
+                        hintText: 'State',
+                        prefixIcon: Icon(Icons.map_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _postalCodeController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Postal Code',
+                        hintText: '6 digits',
+                        prefixIcon: Icon(Icons.markunread_mailbox_outlined),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Expanded(
+                    child: TextField(
+                      controller: _countryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Country',
+                        hintText: 'Country',
+                        prefixIcon: Icon(Icons.public_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+
+              TextField(
+                controller: _panController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'PAN',
+                  hintText: 'ABCDE1234F',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+              ),
+              SizedBox(height: 16.h),
+
+              TextField(
+                controller: _aadhaarController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Aadhaar Number',
+                  hintText: '12-digit Aadhaar',
+                  prefixIcon: Icon(Icons.credit_card_outlined),
                 ),
               ),
               SizedBox(height: 16.h),

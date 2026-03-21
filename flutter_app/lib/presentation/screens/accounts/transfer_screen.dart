@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../data/models/account_models.dart';
@@ -34,6 +35,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
   List<AccountDTO> _accounts = const <AccountDTO>[];
   String? _selectedFromAccount;
   static const double _dailyTransferLimit = 1000000.0;
+  static const List<double> _quickAmounts = <double>[500, 1000, 5000, 10000];
 
   @override
   void initState() {
@@ -47,6 +49,48 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
     _selectedFromAccount = widget.sourceAccountNumber?.trim();
     _loadAccounts();
     _loadSavedBeneficiaries();
+  }
+
+  AccountDTO? get _selectedAccountModel {
+    final selected = _selectedFromAccount;
+    if (selected == null || selected.trim().isEmpty) {
+      return null;
+    }
+    for (final account in _accounts) {
+      if (account.accountNumber == selected) {
+        return account;
+      }
+    }
+    return null;
+  }
+
+  void _applyQuickAmount(double amount) {
+    _amountController.text = amount.toStringAsFixed(2);
+    _amountController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _amountController.text.length),
+    );
+    setState(() {
+      _errorMessage = null;
+    });
+  }
+
+  void _useMaximumTransferable() {
+    final selected = _selectedAccountModel;
+    if (selected == null) {
+      setState(() {
+        _errorMessage = 'Select a source account first.';
+      });
+      return;
+    }
+
+    if (selected.balance <= 0) {
+      setState(() {
+        _errorMessage = 'Selected account has insufficient balance.';
+      });
+      return;
+    }
+
+    _applyQuickAmount(selected.balance);
   }
 
   @override
@@ -114,6 +158,9 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       final apiService = ref.read(apiServiceProvider);
       final hasMpin = await apiService.hasMpinForCurrentUser();
       if (!hasMpin) {
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _isLoading = false;
           _errorMessage =
@@ -124,6 +171,9 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
       final isMpinVerified = await _promptAndVerifyMpin();
       if (!isMpinVerified) {
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _isLoading = false;
           _errorMessage = 'Invalid MPIN. Transfer cancelled.';
@@ -134,6 +184,9 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       final amount = double.parse(_amountController.text);
       final withinLimit = await _validateDailyLimit(amount);
       if (!withinLimit) {
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _isLoading = false;
         });
@@ -168,7 +221,11 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         await _loadSavedBeneficiaries();
       }
 
+      if (!mounted) {
+        return;
+      }
       setState(() => _successMessage = response);
+      _updateBeneficiaryUsage(amount);
 
       if (mounted) {
         ref.invalidate(beneficiariesProvider);
@@ -181,9 +238,13 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         }
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Transfer failed: ${e.toString()}');
+      if (mounted) {
+        setState(() => _errorMessage = 'Transfer failed: ${e.toString()}');
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -222,6 +283,35 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         () => _errorMessage = 'From and To accounts cannot be the same',
       );
       return false;
+    }
+
+    final controls = ref.read(accountControlProvider);
+    final control = controls[_selectedFromAccount!.trim()];
+    if (control?.isFrozen == true) {
+      setState(() {
+        _errorMessage =
+            'This account is frozen. Unfreeze it in account settings before transferring.';
+      });
+      return false;
+    }
+
+    final workflows = ref.read(beneficiaryWorkflowProvider);
+    final beneficiary = workflows[_toAccountController.text.trim()];
+    if (beneficiary != null) {
+      if (!beneficiary.verified) {
+        setState(() {
+          _errorMessage =
+              'Beneficiary not verified. Complete OTP verification first.';
+        });
+        return false;
+      }
+      if (!beneficiary.isActive) {
+        setState(() {
+          _errorMessage =
+              'Beneficiary is in cooling period. Activation at ${DateFormat('dd MMM, hh:mm a').format(beneficiary.activationTime)}.';
+        });
+        return false;
+      }
     }
 
     try {
@@ -332,26 +422,74 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
     }
 
     final projected = todaySent + newAmount;
-    if (projected > _dailyTransferLimit) {
+    final controls = ref.read(accountControlProvider);
+    final customLimit = controls[sourceAccount]?.dailyLimit;
+    final effectiveLimit = customLimit ?? _dailyTransferLimit;
+    if (projected > effectiveLimit) {
       setState(() {
         _errorMessage =
-            'Daily transfer limit exceeded. Today sent: ₹${todaySent.toStringAsFixed(2)}, limit: ₹${_dailyTransferLimit.toStringAsFixed(2)}';
+            'Daily transfer limit exceeded. Today sent: ₹${todaySent.toStringAsFixed(2)}, limit: ₹${effectiveLimit.toStringAsFixed(2)}';
       });
       return false;
     }
 
+    final workflows = ref.read(beneficiaryWorkflowProvider);
+    final toAccount = _toAccountController.text.trim();
+    final beneficiary = workflows[toAccount];
+    if (beneficiary != null) {
+      final isSameDayUsage = beneficiary.usageDate.year == now.year &&
+          beneficiary.usageDate.month == now.month &&
+          beneficiary.usageDate.day == now.day;
+      final usedToday = isSameDayUsage ? beneficiary.usedToday : 0.0;
+      final projectedForBeneficiary = usedToday + newAmount;
+      if (projectedForBeneficiary > beneficiary.dailyCap) {
+        setState(() {
+          _errorMessage =
+              'Beneficiary cap exceeded. Used: ₹${usedToday.toStringAsFixed(2)} / ₹${beneficiary.dailyCap.toStringAsFixed(2)}';
+        });
+        return false;
+      }
+    }
+
     return true;
+  }
+
+  void _updateBeneficiaryUsage(double amount) {
+    final toAccount = _toAccountController.text.trim();
+    final workflows = Map<String, BeneficiaryWorkflowState>.from(
+        ref.read(beneficiaryWorkflowProvider));
+    final beneficiary = workflows[toAccount];
+    if (beneficiary == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final isSameDayUsage = beneficiary.usageDate.year == now.year &&
+        beneficiary.usageDate.month == now.month &&
+        beneficiary.usageDate.day == now.day;
+    final base = isSameDayUsage ? beneficiary.usedToday : 0.0;
+
+    workflows[toAccount] = beneficiary.copyWith(
+      usedToday: base + amount,
+      usageDate: now,
+    );
+    ref.read(beneficiaryWorkflowProvider.notifier).state = workflows;
   }
 
   Future<void> _showPaymentSuccessAnimation({
     required double amount,
     required String toAccount,
   }) async {
+    if (!mounted) {
+      return;
+    }
+
+    final navigator = Navigator.of(context, rootNavigator: true);
     return showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
-      builder: (context) {
-        final navigator = Navigator.of(context);
+      builder: (dialogContext) {
         return Dialog(
           insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
           child: Padding(
@@ -362,7 +500,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
               curve: Curves.easeOutBack,
               onEnd: () {
                 Future.delayed(const Duration(milliseconds: 600), () {
-                  if (!mounted) {
+                  if (!navigator.mounted) {
                     return;
                   }
                   if (navigator.canPop()) {
@@ -626,6 +764,36 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                   hintText: 'Amount in INR',
                 ),
                 enabled: !_isLoading,
+              ),
+              SizedBox(height: 10.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8.w,
+                      runSpacing: 8.h,
+                      children: _quickAmounts
+                          .map(
+                            (amount) => ActionChip(
+                              label: Text(
+                                '₹${amount.toStringAsFixed(0)}',
+                                style: TextStyle(fontSize: 11.sp),
+                              ),
+                              onPressed: _isLoading
+                                  ? null
+                                  : () => _applyQuickAmount(amount),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  TextButton.icon(
+                    onPressed: _isLoading ? null : _useMaximumTransferable,
+                    icon: const Icon(Icons.bolt, size: 16),
+                    label: const Text('Use Max'),
+                  ),
+                ],
               ),
               SizedBox(height: 20.h),
 
